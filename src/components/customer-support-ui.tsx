@@ -121,9 +121,30 @@ export function CustomerSupportUI({
   const [activeTab, setActiveTab] = useState<'Student' | 'Tutor'>('Student');
   const [isAgentConnected, setIsAgentConnected] = useState(false);
   const [joiningChat, setJoiningChat] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  
+  // Agent names for random assignment
+  const agentNames = ['Jonathan', 'William', 'James', 'Grace', 'Chloe', 'Krystel'];
+  const [currentAgentName, setCurrentAgentName] = useState<string>('');
+  const [isMounted, setIsMounted] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Get or assign random agent name for this session
+  const getAgentName = () => {
+    if (!currentAgentName && isMounted) {
+      const randomName = agentNames[Math.floor(Math.random() * agentNames.length)];
+      setCurrentAgentName(randomName);
+      return randomName;
+    }
+    return currentAgentName;
+  };
+
+  // Client-side only: Generate random agent name after mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Load all support rooms
   const loadRooms = async () => {
@@ -157,6 +178,10 @@ export function CustomerSupportUI({
       setLoadingMessages(true);
       // Reset agent connection status first
       setIsAgentConnected(false);
+      // Reset agent name when switching to a new room for true randomization
+      if (isMounted) {
+        setCurrentAgentName('');
+      }
       
       // Find the room data from existing rooms to avoid extra API call
       const roomData = rooms.find(room => room.id === roomId);
@@ -180,6 +205,11 @@ export function CustomerSupportUI({
         });
         
         setMessages(sortedMessages);
+        // Reset unread count for this room when messages are loaded
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [roomId]: 0
+        }));
         if (!roomData) {
           setSelectedRoom(data.messages);
           const isConnected = data.messages.admin_id === currentUserId;
@@ -218,7 +248,8 @@ export function CustomerSupportUI({
       const joinData = await joinResponse.json();
       
       if (joinData.success) {
-        // Send agent connected message
+        // Send agent connected message with random name
+        const agentName = getAgentName();
         const messageResponse = await fetch('/api/support/messages', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -226,7 +257,7 @@ export function CustomerSupportUI({
               sender_id: currentUserId || 'admin-user',
               user_type: 'admin',
               room_id: roomId,
-              message: 'Agent connected to chat',
+              message: `Agent ${agentName} connected to chat`,
               message_type: CustomerSupportMessageType.CONNECTEDAGENT,
               url: null
             }),
@@ -292,7 +323,8 @@ export function CustomerSupportUI({
     try {
       setError(null);
       
-      // Send agent left message
+      // Send agent left message with same name
+      const agentName = getAgentName();
       const response = await fetch('/api/support/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -300,7 +332,7 @@ export function CustomerSupportUI({
           sender_id: currentUserId || 'admin-user',
           user_type: 'admin',
           room_id: selectedRoom.id,
-          message: 'Agent has left the chat',
+          message: `Agent ${agentName} has left the chat`,
           message_type: CustomerSupportMessageType.AGENTLEFT,
           url: null
         }),
@@ -309,8 +341,24 @@ export function CustomerSupportUI({
       const data = await response.json();
       
       if (data.success) {
-        setIsAgentConnected(false);
-        // Real-time listener will automatically update messages
+        // Update room to set with_agent to false and remove admin_id
+        const leaveResponse = await fetch('/api/support/admin/leave-room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            room_id: selectedRoom.id,
+            admin_id: currentUserId || 'admin-user'
+          }),
+        });
+        
+        const leaveData = await leaveResponse.json();
+        
+        if (leaveData.success) {
+          setIsAgentConnected(false);
+          // Real-time listener will automatically update messages
+        } else {
+          setError(leaveData.error || 'Failed to leave room');
+        }
       } else {
         setError(data.error || 'Failed to leave chat');
       }
@@ -375,12 +423,47 @@ export function CustomerSupportUI({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const formatMessageTime = (timestamp: Timestamp | string) => {
+  const formatMessageTime = (timestamp: Timestamp | string | any) => {
     try {
-      const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
+      let date: Date;
+      
+      // Handle Firebase Timestamp object
+      if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      }
+      // Handle Firebase Timestamp object with _seconds and _nanoseconds properties
+      else if (timestamp && typeof timestamp === 'object') {
+        if (timestamp._seconds !== undefined) {
+          date = new Date(timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1000000);
+        }
+        // Handle Firestore Timestamp from Firestore SDK
+        else if (timestamp.seconds !== undefined) {
+          date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000);
+        }
+        // Fallback to string conversion
+        else {
+          date = new Date(timestamp);
+        }
+      }
+      // Handle string timestamp
+      else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      }
+      // Handle other cases
+      else {
+        date = new Date(timestamp);
+      }
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('Invalid timestamp:', timestamp);
+        return '--:--';
+      }
+      
       return format(date, 'HH:mm');
-    } catch {
-      return 'Invalid time';
+    } catch (error) {
+      console.error('Error formatting time:', error, timestamp);
+      return '--:--';
     }
   };
 
@@ -439,45 +522,128 @@ export function CustomerSupportUI({
     return 'No messages yet';
   };
 
+  // Helper function to get full URL from relative path
+  const getFullUrl = (path: string | undefined): string => {
+    if (!path) return '';
+    
+    // If already a full URL, return as is
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    
+    // Construct full URL using DigitalOcean Spaces CDN
+    const baseUrl = 'https://oureasygamestoreage.nyc3.cdn.digitaloceanspaces.com';
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    return `${baseUrl}/${cleanPath}`;
+  };
+
   // Render message content based on type
   const renderMessageContent = (message: SupportMessage) => {
     switch (message.message_type) {
       case CustomerSupportMessageType.IMAGE:
+        const imageUrl = getFullUrl(message.url || message.message);
+        // Hide the message if it's just a storage path
+        const isImagePath = message.message && (message.message.startsWith('/live/storage/') || message.message.startsWith('/storage/') || message.message === imageUrl);
         return (
           <div>
             <img 
-              src={message.url || message.message} 
+              src={imageUrl} 
               alt="Shared image" 
               className="max-w-full rounded-lg cursor-pointer" 
-              onClick={() => window.open(message.url || message.message, '_blank')} 
+              onClick={() => window.open(imageUrl, '_blank')} 
             />
-            {message.message && message.message !== message.url && !message.message.startsWith('http') && (
+            {message.message && !isImagePath && message.message !== message.url && !message.message.startsWith('http') && (
               <p className="text-sm mt-2">{message.message}</p>
             )}
           </div>
         );
       
       case CustomerSupportMessageType.AUDIO:
+        const audioUrl = getFullUrl(message.url || message.message);
+        // Hide the message if it's just a storage path
+        const isAudioPath = message.message && (message.message.startsWith('/live/storage/') || message.message.startsWith('/storage/') || message.message === audioUrl);
+        
+        console.log('Audio message:', {
+          message_type: message.message_type,
+          url: message.url,
+          message: message.message,
+          audioUrl: audioUrl,
+          isAudioPath: isAudioPath
+        });
+        
+        if (!audioUrl) {
+          return (
+            <div className="flex items-center space-x-2 text-yellow-400">
+              <File className="h-4 w-4" />
+              <span className="text-sm">Audio file not available</span>
+            </div>
+          );
+        }
+        
+        // Determine the audio MIME type based on file extension
+        const getAudioType = (url: string): string => {
+          const lowerUrl = url.toLowerCase();
+          if (lowerUrl.endsWith('.m4a')) return 'audio/m4a';
+          if (lowerUrl.endsWith('.mp3')) return 'audio/mpeg';
+          if (lowerUrl.endsWith('.mp4')) return 'audio/mp4';
+          if (lowerUrl.endsWith('.wav')) return 'audio/wav';
+          if (lowerUrl.endsWith('.ogg')) return 'audio/ogg';
+          return 'audio/mpeg'; // default
+        };
+        
         return (
-          <div>
-            <audio controls className="w-full">
-              <source src={message.url || message.message} type="audio/mpeg" />
+          <div className="bg-gray-800 rounded-lg p-4 w-full min-w-[350px]">
+            <audio 
+              controls 
+              className="w-full" 
+              preload="auto" 
+              src={audioUrl}
+              onLoadedMetadata={(e) => {
+                console.log('Audio loaded, duration:', e.currentTarget.duration);
+              }}
+              onError={(e) => {
+                const audioElement = e.currentTarget;
+                const error = audioElement.error;
+                console.error('Audio loading error:', {
+                  code: error?.code,
+                  message: error?.message,
+                  errorType: error?.code === 1 ? 'MEDIA_ERR_ABORTED' : 
+                            error?.code === 2 ? 'MEDIA_ERR_NETWORK' : 
+                            error?.code === 3 ? 'MEDIA_ERR_DECODE' : 
+                            error?.code === 4 ? 'MEDIA_ERR_SRC_NOT_SUPPORTED' : 'UNKNOWN',
+                  audioUrl: audioUrl,
+                  networkState: audioElement.networkState,
+                  readyState: audioElement.readyState
+                });
+              }}
+              onCanPlay={(e) => {
+                console.log('Audio can play:', audioUrl);
+              }}
+              style={{ 
+                minWidth: '350px',
+                height: '60px',
+                minHeight: '60px'
+              }}
+            >
               Your browser does not support the audio element.
             </audio>
-            {message.message && message.message !== message.url && !message.message.startsWith('http') && (
+            {message.message && !isAudioPath && message.message !== message.url && !message.message.startsWith('http') && (
               <p className="text-sm mt-2">{message.message}</p>
             )}
           </div>
         );
       
       case CustomerSupportMessageType.VIDEO:
+        const videoUrl = getFullUrl(message.url || message.message);
+        // Hide the message if it's just a storage path
+        const isVideoPath = message.message && (message.message.startsWith('/live/storage/') || message.message.startsWith('/storage/') || message.message === videoUrl);
         return (
           <div>
             <video controls className="max-w-full rounded-lg">
-              <source src={message.url || message.message} type="video/mp4" />
+              <source src={videoUrl} type="video/mp4" />
               Your browser does not support the video element.
             </video>
-            {message.message && message.message !== message.url && !message.message.startsWith('http') && (
+            {message.message && !isVideoPath && message.message !== message.url && !message.message.startsWith('http') && (
               <p className="text-sm mt-2">{message.message}</p>
             )}
           </div>
@@ -514,7 +680,7 @@ export function CustomerSupportUI({
       
       case CustomerSupportMessageType.CONNECTEDAGENT:
         return (
-          <div className="flex items-center space-x-2 text-green-400">
+          <div className="flex items-center space-x-2 text-yellow-400">
             <CheckCircle className="h-4 w-4" />
             <span>Agent connected to chat</span>
           </div>
@@ -522,7 +688,7 @@ export function CustomerSupportUI({
       
       case CustomerSupportMessageType.AGENTLEFT:
         return (
-          <div className="flex items-center space-x-2 text-yellow-400">
+          <div className="flex items-center space-x-2 text-red-400">
             <UserMinus className="h-4 w-4" />
             <span>Agent has left the chat</span>
           </div>
@@ -701,6 +867,37 @@ export function CustomerSupportUI({
     return () => unsubscribe();
   }, [selectedRoom, currentUserId]);
 
+  // Real-time listener for unread message counts per room
+  useEffect(() => {
+    if (rooms.length === 0) return;
+
+    const unsubscribers: Array<() => void> = [];
+
+    rooms.forEach((room) => {
+      // Listen to unread messages for this room
+      const unreadQuery = query(
+        collection(db, 'support_rooms', room.id, 'messages'),
+        where('seen', '==', false),
+        where('user_type', '!=', 'admin')
+      );
+
+      const unsubscribe = onSnapshot(unreadQuery, (snapshot) => {
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [room.id]: snapshot.size
+        }));
+      }, (error) => {
+        console.error(`Error listening to unread messages for room ${room.id}:`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [rooms]);
+
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
@@ -801,9 +998,9 @@ export function CustomerSupportUI({
                         <p className="text-sm font-medium truncate">
                           {getUserDisplayName(room)}
                         </p>
-                        {room.unread_messages > 0 && (
+                        {(unreadCounts[room.id] || 0) > 0 && (
                           <Badge variant="destructive" className="text-xs">
-                            {room.unread_messages}
+                            {unreadCounts[room.id] || 0}
                           </Badge>
                         )}
                       </div>
@@ -965,9 +1162,16 @@ export function CustomerSupportUI({
                   return (
                     <div
                       key={message.id}
-                      className={`flex ${message.user_type === 'admin' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex items-start gap-3 ${message.user_type === 'admin' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`max-w-[70%] ${message.user_type === 'admin' ? 'order-2' : 'order-1'}`}>
+                      {message.user_type !== 'admin' && (
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarFallback className="bg-blue-600">
+                            <User className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className={`max-w-[70%] ${message.user_type === 'admin' ? 'order-1' : 'order-2'}`}>
                         <div className={`rounded-lg p-3 ${
                           message.user_type === 'admin' 
                             ? 'bg-purple-600 text-white' 
@@ -986,6 +1190,13 @@ export function CustomerSupportUI({
                           </p>
                         </div>
                       </div>
+                      {message.user_type === 'admin' && (
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarFallback className="bg-purple-600">
+                            <MessageCircle className="h-4 w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
                     </div>
                   );
                 })
@@ -999,12 +1210,11 @@ export function CustomerSupportUI({
                 <Textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={isAgentConnected ? "Type your message..." : "Join the chat to start messaging"}
+                  placeholder="Type your message..."
                   className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 resize-none"
                   rows={1}
-                  disabled={!isAgentConnected}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && isAgentConnected) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       sendMessage();
                     }
@@ -1012,16 +1222,26 @@ export function CustomerSupportUI({
                 />
                 <Button
                   onClick={sendMessage}
-                  disabled={!newMessage.trim() || sending || !isAgentConnected}
+                  disabled={!newMessage.trim() || sending}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4"
                 >
                   {sending ? <LoadingSpinner size="sm" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
               {!isAgentConnected && (
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  Join the chat to start messaging with the user
-                </p>
+                <div className="mt-3 bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
+                  <div className="flex items-start space-x-2">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-300">Quick Chat Mode</p>
+                      <p className="text-xs text-blue-400 mt-1">You can send messages directly to the user without formally joining as an agent. This allows for quick responses while maintaining conversation context.</p>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </>

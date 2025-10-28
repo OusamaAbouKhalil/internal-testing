@@ -109,36 +109,77 @@ export const formatDateWithTimezone = (value: any, formatStr: string = 'MMM dd, 
 
   try {
     let date: Date;
+    
+    // Handle Firestore Timestamp
     if (value.toDate && typeof value.toDate === 'function') {
       date = value.toDate();
-    } else if (typeof value === 'string' || typeof value === 'number') {
+    } 
+    // Handle string or number
+    else if (typeof value === 'string' || typeof value === 'number') {
       date = new Date(value);
-    } else if (value instanceof Date) {
+    } 
+    // Handle Date object
+    else if (value instanceof Date) {
       date = value;
-    } else {
+    } 
+    // Handle object with _seconds (Firestore timestamp format)
+    else if (value && typeof value === 'object' && '_seconds' in value) {
+      date = new Date(value._seconds * 1000);
+    } 
+    else {
+      // Silently return invalid date without logging
       return 'Invalid date';
     }
 
-    if (isNaN(date.getTime())) {
+    // Validate the date
+    if (!date || isNaN(date.getTime())) {
+      // Silently return invalid date without logging
       return 'Invalid date';
     }
 
-    // If timezone is provided, format with timezone
+    // If timezone is provided, format with timezone using Intl
     if (timezone) {
-      return new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
+      try {
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone,
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(date);
+      } catch (tzError) {
+        // Fallback to without timezone silently
+        try {
+          return format(date, formatStr);
+        } catch {
+          return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+      }
+    }
+
+    // Format without timezone using date-fns
+    try {
+      return format(date, formatStr);
+    } catch (formatError) {
+      // Fallback to basic formatting silently
+      return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).format(date);
+        minute: '2-digit'
+      });
     }
-
-    return format(date, formatStr);
   } catch (error) {
-    console.error('Error formatting date with timezone:', error, value);
+    // Silently return invalid date without logging
     return 'Invalid date';
   }
 };

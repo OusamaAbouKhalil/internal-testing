@@ -42,7 +42,7 @@ interface RequestManagementStore {
   totalItems: number;
   lastVisibleDoc: QueryDocumentSnapshot | null;
   firstVisibleDoc: QueryDocumentSnapshot | null;
-  pageCache: Map<number, { docs: QueryDocumentSnapshot[], requests: Request[] }>;
+  pageCache: Map<number, { requests: Request[], hasNextPage: boolean, firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }>;
 
   // CRUD Actions
   fetchRequests: (filters?: RequestFilters, pagination?: PaginationParams) => Promise<void>;
@@ -124,20 +124,6 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       // Reset to page 1 if not specified
       const targetPage = pagination?.page || 1;
       const currentPageSize = pagination?.pageSize || state.pageSize;
-      
-      // Check cache first for the exact page
-      const cachedPage = state.pageCache.get(targetPage);
-      if (cachedPage && !pagination?.lastVisible) {
-        set({
-          requests: cachedPage.requests,
-          currentPage: targetPage,
-          hasPreviousPage: targetPage > 1,
-          loading: false,
-          firstVisibleDoc: cachedPage.docs[0] || null,
-          lastVisibleDoc: cachedPage.docs[cachedPage.docs.length - 1] || null
-        });
-        return;
-      }
       
       // Build base query
       let q = query(
@@ -223,10 +209,6 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         });
       }
       
-      // Cache the page
-      const newCache = new Map(state.pageCache);
-      newCache.set(targetPage, { docs: requestDocs, requests: filteredRequests });
-      
       set({ 
         requests: filteredRequests,
         currentPage: targetPage,
@@ -235,7 +217,6 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         hasPreviousPage: targetPage > 1,
         firstVisibleDoc: requestDocs[0] || null,
         lastVisibleDoc: requestDocs[requestDocs.length - 1] || null,
-        pageCache: newCache,
         loading: false 
       });
     } catch (error: any) {
@@ -274,11 +255,18 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
   // Go to specific page
   goToPage: async (page: number, filters = {}) => {
     const state = get();
-    if (page < 1 || state.loading) return;
+    
+    if (page < 1 || state.loading) {
+      return;
+    }
+    
+    // If going to page 1, force a refresh to ensure proper state
+    const forceRefresh = page === 1;
     
     await get().fetchRequests(filters, {
       page,
-      pageSize: state.pageSize
+      pageSize: state.pageSize,
+      forceRefresh
     });
   },
   

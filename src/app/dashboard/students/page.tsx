@@ -37,7 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { useStudentManagementStore } from "@/stores/student-management-store";
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
 import { useResourcesManagementStore } from "@/stores/resources-management-store";
-import { Student, StudentFilters } from "@/types/student";
+import { Student, StudentFilters, StudentEducationLevelEnum, StudentEducationLevelLabel } from "@/types/student";
 import { getStudentProfileImageUrl } from "@/lib/file-upload";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -45,17 +45,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [emailTerm, setEmailTerm] = useState("");
+  const [nicknameTerm, setNicknameTerm] = useState("");
+  const [phoneTerm, setPhoneTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [debouncedEmailTerm, setDebouncedEmailTerm] = useState("");
+  const [debouncedNicknameTerm, setDebouncedNicknameTerm] = useState("");
+  const [debouncedPhoneTerm, setDebouncedPhoneTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<StudentFilters>({});
+  const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'not_verified' | 'deleted' | 'banned'>('all');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState({
-    studentLevels: new Set<string>(),
-    majors: new Set<string>(),
     countries: new Set<string>(),
     nationalities: new Set<string>()
   });
@@ -85,6 +91,42 @@ export default function StudentsPage() {
     fetchSubjects();
   }, []);
 
+  // Debounce search term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Debounce email term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmailTerm(emailTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [emailTerm]);
+
+  // Debounce nickname term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNicknameTerm(nicknameTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [nicknameTerm]);
+
+  // Debounce phone term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneTerm(phoneTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [phoneTerm]);
+
   // Helper function to get language names for a student
   const getStudentLanguages = useCallback((student: Student) => {
     if (!student.languages || !Array.isArray(student.languages)) return [];
@@ -107,19 +149,11 @@ export default function StudentsPage() {
   useEffect(() => {
     if (students.length > 0) {
       const newFilterOptions = {
-        studentLevels: new Set<string>(),
-        majors: new Set<string>(),
         countries: new Set<string>(),
         nationalities: new Set<string>()
       };
 
       students.forEach(student => {
-        if (student.student_level) {
-          newFilterOptions.studentLevels.add(student.student_level);
-        }
-        if (student.majorId) {
-          newFilterOptions.majors.add(student.majorId.toString());
-        }
         if (student.country) {
           newFilterOptions.countries.add(student.country);
         }
@@ -134,12 +168,26 @@ export default function StudentsPage() {
 
   useEffect(() => {
     const searchFilters: StudentFilters = {
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
       ...filters
     };
     resetPagination();
     fetchStudents(searchFilters);
-  }, [searchTerm, filters]);
+  }, [debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, filters]);
+
+  const handleTabChange = (tab: 'all' | 'verified' | 'not_verified' | 'deleted' | 'banned') => {
+    setActiveTab(tab);
+    // Reset related filters, then set tab-specific ones
+    const base = { ...filters, verified: undefined, deleted: undefined, is_banned: undefined } as StudentFilters;
+    if (tab === 'verified') setFilters({ ...base, verified: '1' });
+    else if (tab === 'not_verified') setFilters({ ...base, verified: '0' });
+    else if (tab === 'deleted') setFilters({ ...base, deleted: true });
+    else if (tab === 'banned') setFilters({ ...base, is_banned: '1' });
+    else setFilters(base);
+  };
 
   const handleCreateStudent = useCallback(async (studentData: any) => {
     await createStudent(studentData);
@@ -260,7 +308,13 @@ export default function StudentsPage() {
           <div>
             <h1 className="text-3xl font-bold">Students</h1>
             <p className="text-muted-foreground mt-2">Manage student accounts and information</p>
-            <p className="text-sm text-muted-foreground mt-1">Total: {totalCount} students</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {students.length > 0 ? (
+                <>Showing {students.length} of {totalCount} student{totalCount !== 1 ? 's' : ''}</>
+              ) : (
+                <>Total: {totalCount} student{totalCount !== 1 ? 's' : ''}</>
+              )}
+            </p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -318,204 +372,74 @@ export default function StudentsPage() {
 
         {/* Search and Filters */}
         <div className="space-y-4">
+          {/* Status Tabs */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'verified', label: 'Verified' },
+              { key: 'not_verified', label: 'Not Verified' },
+              { key: 'deleted', label: 'Deleted' },
+              { key: 'banned', label: 'Banned' },
+            ].map((tab) => (
+              <Button
+                key={tab.key}
+                variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleTabChange(tab.key as any)}
+                className="whitespace-nowrap"
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search by name, email, phone, major, country, requests, sign-in method, spend amount, etc..."
+                placeholder="Search by name, country, etc..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" onClick={() => setShowFilters((v) => !v)} className="whitespace-nowrap">
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
+            <div className="relative flex-1">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by email..."
+                value={emailTerm}
+                onChange={(e) => setEmailTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by phone..."
+                value={phoneTerm}
+                onChange={(e) => setPhoneTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Label className="text-sm font-medium">Sign-in Method</Label>
+              <Select
+                value={filters.sign_in_method || "all"}
+                onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="google">Google</SelectItem>
+                  <SelectItem value="apple">Apple</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          {showFilters && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Filters</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Verification Status</Label>
-                    <Select
-                      value={filters.verified?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, verified: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="true">Verified</SelectItem>
-                        <SelectItem value="false">Not Verified</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Ban Status</Label>
-                    <Select
-                      value={filters.is_banned?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, is_banned: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="false">Active</SelectItem>
-                        <SelectItem value="true">Banned</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Student Level</Label>
-                    <Select
-                      value={filters.student_level || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, student_level: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Levels" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Levels</SelectItem>
-                        {Array.from(filterOptions.studentLevels).sort((a, b) => a.localeCompare(b)).map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {level}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Major</Label>
-                    <Select
-                      value={filters.majorId?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, majorId: value === 'all' ? undefined : parseInt(value) })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Majors" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Majors</SelectItem>
-                        {Array.from(filterOptions.majors).sort((a, b) => parseInt(a) - parseInt(b)).map((majorId) => {
-                          const majorName = getMajorName(parseInt(majorId));
-                          return (
-                            <SelectItem key={majorId} value={majorId}>
-                              {majorName || `Major ID: ${majorId}`}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Country</Label>
-                    <Select
-                      value={filters.country || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, country: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Countries" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Countries</SelectItem>
-                        {Array.from(filterOptions.countries).sort((a, b) => a.localeCompare(b)).map((country) => (
-                          <SelectItem key={country} value={country}>
-                            {country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Nationality</Label>
-                    <Select
-                      value={filters.nationality || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, nationality: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Nationalities" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Nationalities</SelectItem>
-                        {Array.from(filterOptions.nationalities).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })).map((nationality) => (
-                          <SelectItem key={nationality} value={nationality}>
-                            {nationality}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label>Has Requests</Label>
-                    <Select
-                      value={filters.has_requests?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, has_requests: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">With Requests</SelectItem>
-                        <SelectItem value="false">No Requests</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Sign-in Method</Label>
-                    <Select
-                      value={filters.sign_in_method || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="apple">Apple</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Min Spend Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={filters.min_spend || ''}
-                      onChange={(e) => setFilters({ ...filters, min_spend: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Max Spend Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="1000.00"
-                      value={filters.max_spend || ''}
-                      onChange={(e) => setFilters({ ...filters, max_spend: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Error Alert */}
@@ -755,8 +679,12 @@ export default function StudentsPage() {
                       <span>Joined {new Date(student.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      {getSignInMethodIcon(student.sign_in_method)}
-                      <span>{getSignInMethodLabel(student.sign_in_method)}</span>
+                      {student?.sign_in_methods?.length && student?.sign_in_methods?.length > 0 && student?.sign_in_methods?.map((method) => (
+                        <div key={method}>
+                          {getSignInMethodIcon(method)}
+                          <span>{getSignInMethodLabel(method)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

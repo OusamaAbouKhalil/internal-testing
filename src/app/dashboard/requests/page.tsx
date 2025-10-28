@@ -153,26 +153,42 @@ function RequestCard({ request }: { request: Request }) {
       
       return format(date, 'MMM dd, yyyy');
     } catch (error) {
-      console.error('Error formatting date:', error, value);
       return 'Invalid date';
     }
   };
 
   const formatDeadline = (request: Request) => {
     try {
-      // If we have both date and time, combine them
-      if (request.date && request.deadline) {
-        const combinedDate = combineDateAndTime(request.date, request.deadline);
+      // Use the deadline field directly (it's already a combined date+time)
+      if (request.deadline) {
         // Use timezone if available, otherwise use local formatting
         if (request.timezone) {
-          return formatDateWithTimezone(combinedDate, 'MMM dd, yyyy HH:mm', request.timezone);
+          return formatDateWithTimezone(request.deadline, 'MMM dd, yyyy HH:mm', request.timezone);
         }
-        return format(combinedDate, 'MMM dd, yyyy HH:mm');
+        
+        // Handle different date formats
+        const deadlineValue: any = request.deadline;
+        let date: Date;
+        
+        if (typeof deadlineValue === 'string' || typeof deadlineValue === 'number') {
+          date = new Date(deadlineValue);
+        } else if (deadlineValue && typeof deadlineValue.toDate === 'function') {
+          date = deadlineValue.toDate();
+        } else if (deadlineValue instanceof Date) {
+          date = deadlineValue;
+        } else {
+          return 'Invalid date';
+        }
+        
+        if (isNaN(date.getTime())) {
+          return 'Invalid date';
+        }
+        
+        return format(date, 'MMM dd, yyyy HH:mm');
       }
       
       return 'Not set';
     } catch (error) {
-      console.error('Error formatting deadline:', error);
       return 'Invalid date';
     }
   };
@@ -454,7 +470,7 @@ export default function RequestsPage() {
 
   // Create dynamic request type options from RequestType enum
   const requestTypeOptions = Object.values(RequestType).map(type => ({
-    value: type,
+    value: type === RequestType.SOS ? 'SOS' : type,
     label: getRequestTypeLabel(type)
   }));
 
@@ -465,14 +481,16 @@ export default function RequestsPage() {
       setPageSize(pageSize); // This clears the cache
       fetchRequests(filters, { page: 1, pageSize });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   useEffect(() => {
-    // Initial load
+    // Initial load - only run once
     if (isInitialLoad) {
       fetchRequests({}, { page: 1, pageSize });
       setIsInitialLoad(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFilterChange = (key: keyof RequestFilters, value: string) => {

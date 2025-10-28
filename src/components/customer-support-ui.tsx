@@ -731,20 +731,20 @@ export function CustomerSupportUI({
           <div className="flex">
             <button
               onClick={() => setActiveTab('Student')}
-              className={`flex-1 px-4 py-3 text-sm font-medium ${
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
                 activeTab === 'Student' 
-                  ? 'text-purple-400 border-b-2 border-purple-400' 
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-50/10' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-gray-50/5'
               }`}
             >
               Student
             </button>
             <button
               onClick={() => setActiveTab('Tutor')}
-              className={`flex-1 px-4 py-3 text-sm font-medium ${
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
                 activeTab === 'Tutor' 
-                  ? 'text-purple-400 border-b-2 border-purple-400' 
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-50/10' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-gray-50/5'
               }`}
             >
               Tutor

@@ -47,6 +47,23 @@ const determineSignInMethod = (student: any): 'manual' | 'facebook' | 'google' |
   return 'manual';
 };
 
+// Helper function to determine ALL sign-in methods based on social IDs
+const determineSignInMethods = (student: any): ('manual' | 'facebook' | 'google' | 'apple')[] => {
+  const methods: ('manual' | 'facebook' | 'google' | 'apple')[] = [];
+  
+  // Check for multiple social IDs
+  if (student.facebook_id) methods.push('facebook');
+  if (student.google_id) methods.push('google');
+  if (student.apple_id) methods.push('apple');
+  
+  // If no social IDs, user signed in manually
+  if (methods.length === 0) {
+    methods.push('manual');
+  }
+  
+  return methods;
+};
+
 // Helper function to convert Firestore document to Student
 const convertFirestoreDocToStudent = (doc: any): Student => {
   const data = doc.data();
@@ -58,8 +75,11 @@ const convertFirestoreDocToStudent = (doc: any): Student => {
     deleted_at: data.deleted_at?.toDate?.()?.toISOString() || data.deleted_at,
   } as Student;
   
-  // Determine and add sign-in method
+  // Determine and add sign-in method (backwards compatibility)
   student.sign_in_method = determineSignInMethod(student);
+  
+  // Determine and add all sign-in methods
+  student.sign_in_methods = determineSignInMethods(student);
   
   return student;
 };
@@ -119,48 +139,128 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       const studentsRef = collection(db, 'students');
       let students: Student[] = [];
       
-      // Apply search filter with comprehensive field search
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
+      // Determine which field to use for range query (only one allowed per query)
+      const hasEmailFilter = !!filters.email;
+      const hasNicknameFilter = !!filters.nickname;
+      const hasSearchFilter = !!filters.search;
+      
+      // Build base query with equality filters
+      const buildBaseQuery = (baseRef: any, useRangeField?: 'email' | 'nickname', includeLimit = true) => {
+        let constraints: any[] = [];
         
-        // For better performance, we'll fetch a larger set and filter client-side
-        // This reduces the number of queries while still providing comprehensive search
-        let q = query(studentsRef, orderBy('created_at', 'desc'), limit(100));
-        
-        // Apply other filters first to reduce the dataset
+        // Add equality filters
         if (filters.verified !== undefined) {
-          q = query(q, where('verified', '==', filters.verified ? '1' : '0'));
+          constraints.push(where('verified', '==', filters.verified === '1' ? '1' : '0'));
         }
-        
+
         if (filters.is_banned !== undefined) {
-          q = query(q, where('is_banned', '==', filters.is_banned ? '1' : '0'));
+          constraints.push(where('is_banned', '==', filters.is_banned === '1' ? '1' : '0'));
+        }
+
+        // Apply sign_in_method filter
+        if (filters.sign_in_method) {
+          if(filters.sign_in_method == 'google') {
+            constraints.push(where('google_id', '!=', null));
+          } else if(filters.sign_in_method == 'facebook') {
+            constraints.push(where('facebook_id', '!=', null));
+          } else if(filters.sign_in_method == 'apple') {
+            constraints.push(where('apple_id', '!=', null));
+          } else {
+            constraints.push(where('google_id', '==', null));
+            constraints.push(where('facebook_id', '==', null));
+            constraints.push(where('apple_id', '==', null));
+          }
+        }
+
+        if (filters.deleted !== undefined && filters.deleted === true) {
+          constraints.push(where('deleted_at', '!=', null));
+        }
+
+        if (filters.phone_number !== undefined) {
+          constraints.push(where('phone_number', '>=', filters.phone_number));
+          constraints.push(where('phone_number', '<=', filters.phone_number + '\uf8ff'));
         }
         
-        if (filters.student_level) {
-          q = query(q, where('student_level', '==', filters.student_level));
+        // Add orderBy - required for queries that use where clauses
+        if (constraints.length > 0 || !useRangeField) {
+          constraints.push(orderBy('created_at', 'desc'));
         }
         
-        if (filters.majorId) {
-          q = query(q, where('majorId', '==', filters.majorId));
+        // Add range query for email or nickname (not both - Firestore limitation)
+        if (useRangeField === 'email' && hasEmailFilter) {
+          const emailLower = filters.email!.toLowerCase();
+          constraints.push(where('email', '>=', emailLower));
+          constraints.push(where('email', '<=', emailLower + '\uf8ff'));
+        } 
+        
+        // Add limit only if requested
+        if (includeLimit) {
+          constraints.push(limit(hasSearchFilter ? 100 : 20));
         }
         
-        if (filters.country) {
-          q = query(q, where('country', '==', filters.country));
-        }
-        
-        if (filters.gender) {
-          q = query(q, where('gender', '==', filters.gender));
-        }
-        
-        const studentsSnapshot = await getDocs(q);
-        const allStudents = studentsSnapshot.docs.map(convertFirestoreDocToStudent);
-        
-        // Filter students by search term across all relevant fields
-        students = allStudents.filter(student => {
+        return query(baseRef, ...constraints);
+      };
+      
+      // Decide query strategy based on active filters
+      let q;
+      let countQuery;
+      let rangeField: 'email' | 'nickname' | undefined;
+      
+      if (hasEmailFilter && !hasNicknameFilter) {
+        // Email filter takes priority
+        rangeField = 'email';
+        q = buildBaseQuery(studentsRef, 'email');
+        countQuery = buildBaseQuery(studentsRef, 'email', false);
+      } else if (hasNicknameFilter && !hasEmailFilter) {
+        // Nickname filter takes priority
+        rangeField = 'nickname';
+        q = buildBaseQuery(studentsRef, 'nickname');
+        countQuery = buildBaseQuery(studentsRef, 'nickname', false);
+      } else if (hasEmailFilter && hasNicknameFilter) {
+        // Both filters active - prioritize email in Firebase, filter nickname client-side
+        rangeField = 'email';
+        q = buildBaseQuery(studentsRef, 'email');
+        countQuery = buildBaseQuery(studentsRef, 'email', false);
+      } else {
+        // No email/nickname filters
+        rangeField = undefined;
+        q = buildBaseQuery(studentsRef);
+        countQuery = buildBaseQuery(studentsRef, undefined, false);
+      }
+      
+      // Apply pagination
+      if (loadMore && get().lastDoc) {
+        q = query(q, startAfter(get().lastDoc));
+      }
+      
+      // Fetch students and total count in parallel (only on first load, not on loadMore)
+      let totalCountValue = get().totalCount;
+      
+      const [studentsSnapshot, countSnapshot] = await Promise.all([
+        getDocs(q),
+        loadMore ? Promise.resolve(null) : getCountFromServer(countQuery)
+      ]);
+      
+      if (countSnapshot) {
+        totalCountValue = countSnapshot.data().count;
+      }
+      
+      let allStudents = studentsSnapshot.docs.map(convertFirestoreDocToStudent);
+      
+      // Client-side filtering for nickname when both email and nickname filters are active
+      if (hasEmailFilter && hasNicknameFilter) {
+        const nicknameTerm = filters.nickname!.toLowerCase();
+        allStudents = allStudents.filter(student => 
+          student.nickname?.toLowerCase().includes(nicknameTerm)
+        );
+      }
+      
+      // Apply general search filter across all fields
+      if (hasSearchFilter) {
+        const searchTerm = filters.search!.toLowerCase();
+        allStudents = allStudents.filter(student => {
           const searchableFields = [
             student.full_name?.toLowerCase(),
-            student.nickname?.toLowerCase(),
-            student.email?.toLowerCase(),
             student.phone_number?.toLowerCase(),
             student.student_level?.toLowerCase(),
             student.majorId?.toString(),
@@ -169,139 +269,60 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
             student.city?.toLowerCase(),
             student.nationality?.toLowerCase(),
             student.gender?.toLowerCase(),
-            student.request_count?.toString(), // Allow searching by request count
-            student.sign_in_method?.toLowerCase(), // Allow searching by sign-in method
-            student.spend_amount?.toString() // Allow searching by spend amount
-          ].filter(Boolean); // Remove undefined/null values
+            student.request_count?.toString(),
+            student.sign_in_method?.toLowerCase(),
+            student.spend_amount?.toString()
+          ].filter(Boolean);
           
           return searchableFields.some(field => field?.includes(searchTerm));
         });
-        
-        // Sort by created_at descending
+      }
+      
+      students = allStudents;
+      
+      // Get request counts for filtered students
+      students = await getStudentsRequestCounts(students);
+      
+      
+      
+      // Sort by created_at if not already sorted by range query
+      if (!hasEmailFilter && !hasNicknameFilter) {
         students = students.sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        
-        // Get request counts for filtered students
-        students = await getStudentsRequestCounts(students);
-        
-        // Apply has_requests filter if specified
-        if (filters.has_requests !== undefined) {
-          students = students.filter(student => 
-            filters.has_requests ? (student.request_count || 0) > 0 : (student.request_count || 0) === 0
-          );
+      }
+      
+      // Calculate total count before pagination
+      // For searches and client-side filtered queries, the count is the filtered result count
+      // For Firebase-only queries, use the Firebase count
+      const hasClientSideFilters = hasSearchFilter || 
+                                    (hasEmailFilter && hasNicknameFilter) ||
+                                    filters.has_requests !== undefined ||
+                                    filters.sign_in_method !== undefined;
+      
+      if (!loadMore) {
+        if (hasClientSideFilters) {
+          // For client-side filtered queries, count the filtered results
+          totalCountValue = students.length;
         }
-        
-        // Apply sign_in_method filter if specified
-        if (filters.sign_in_method) {
-          students = students.filter(student => 
-            student.sign_in_method === filters.sign_in_method
-          );
-        }
-        
-        // Apply spend amount filters if specified
-        if (filters.min_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) >= filters.min_spend!
-          );
-        }
-        
-        if (filters.max_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) <= filters.max_spend!
-          );
-        }
-        
-        // Apply pagination to filtered results
+        // Otherwise, use the Firebase count we already fetched
+      }
+      
+      // Apply pagination for search results
+      if (hasSearchFilter || hasEmailFilter || hasNicknameFilter) {
         const startIndex = loadMore ? get().students.length : 0;
         const endIndex = startIndex + 20;
         students = students.slice(startIndex, endIndex);
-        
-      } else {
-        // No search term - use regular query with other filters
-        let q = query(studentsRef, orderBy('created_at', 'desc'), limit(20));
-        
-        if (filters.verified !== undefined) {
-          q = query(q, where('verified', '==', filters.verified ? '1' : '0'));
-        }
-        
-        if (filters.is_banned !== undefined) {
-          q = query(q, where('is_banned', '==', filters.is_banned ? '1' : '0'));
-        }
-        
-        if (filters.student_level) {
-          q = query(q, where('student_level', '==', filters.student_level));
-        }
-        
-        if (filters.majorId) {
-          q = query(q, where('majorId', '==', filters.majorId));
-        }
-        
-        if (filters.country) {
-          q = query(q, where('country', '==', filters.country));
-        }
-        
-        if (filters.gender) {
-          q = query(q, where('gender', '==', filters.gender));
-        }
-        
-        // Apply pagination
-        if (loadMore && get().lastDoc) {
-          q = query(q, startAfter(get().lastDoc));
-        }
-        
-        const studentsSnapshot = await getDocs(q);
-        students = studentsSnapshot.docs.map(convertFirestoreDocToStudent);
-        
-        // Get request counts for students
-        students = await getStudentsRequestCounts(students);
-        
-        // Apply has_requests filter if specified
-        if (filters.has_requests !== undefined) {
-          students = students.filter(student => 
-            filters.has_requests ? (student.request_count || 0) > 0 : (student.request_count || 0) === 0
-          );
-        }
-        
-        // Apply sign_in_method filter if specified
-        if (filters.sign_in_method) {
-          students = students.filter(student => 
-            student.sign_in_method === filters.sign_in_method
-          );
-        }
-        
-        // Apply spend amount filters if specified
-        if (filters.min_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) >= filters.min_spend!
-          );
-        }
-        
-        if (filters.max_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) <= filters.max_spend!
-          );
-        }
-        
-        set(state => ({
-          students: loadMore ? [...state.students, ...students] : students,
-          lastDoc: studentsSnapshot.docs[studentsSnapshot.docs.length - 1] || null,
-          hasMore: studentsSnapshot.docs.length === 20,
-          totalCount: loadMore ? state.totalCount : studentsSnapshot.size,
-          loading: false,
-        }));
       }
       
-      // For search results, update state differently
-      if (filters.search) {
-        set(state => ({
-          students: loadMore ? [...state.students, ...students] : students,
-          lastDoc: null, // Reset pagination for search results
-          hasMore: students.length === 20, // Check if we got a full page
-          totalCount: students.length,
-          loading: false,
-        }));
-      }
+      // Update state for all results
+      set(state => ({
+        students: loadMore ? [...state.students, ...students] : students,
+        lastDoc: hasSearchFilter || hasEmailFilter || hasNicknameFilter ? null : studentsSnapshot.docs[studentsSnapshot.docs.length - 1] || null,
+        hasMore: students.length === 20,
+        totalCount: loadMore ? state.totalCount : totalCountValue,
+        loading: false,
+      }));
       
     } catch (error: any) {
       console.error('Error fetching students:', error);

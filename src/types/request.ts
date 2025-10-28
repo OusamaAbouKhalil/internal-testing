@@ -85,7 +85,7 @@ export enum RequestType {
   PROJECT = 'PROJECT',
   THESIS = 'THESIS',
   ONLINE = 'ONLINE',
-  SOS = 'SOS'
+  'SOS' = 'Q&A'
 }
 
 export enum RequestStatus {
@@ -161,6 +161,8 @@ export const getRequestTypeLabel = (type: string): string => {
     case 'online':
       return 'Online Class';
     case 'q&a':
+      return 'Q&A';
+    case 'sos':
       return 'Q&A';
     case 'one-on-one':
       return 'One-on-One';
@@ -279,6 +281,7 @@ export interface PaginationParams {
   page?: number;
   pageSize?: number;
   lastVisible?: any; // Firestore document snapshot
+  forceRefresh?: boolean; // Force a refresh even if cached
 }
 
 export interface PaginatedResponse<T> {

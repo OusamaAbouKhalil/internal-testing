@@ -46,6 +46,7 @@ export interface Student {
     feedback?: string;
     request_count?: number;
     sign_in_method?: 'manual' | 'facebook' | 'google' | 'apple';
+    sign_in_methods?: ('manual' | 'facebook' | 'google' | 'apple')[]; // Multiple sign-in methods supported
     spend_amount?: number;
   }
   
@@ -146,14 +147,18 @@ export const StudentAuthMethodLabel: Record<StudentAuthMethodEnum, string> = {
   
 export interface StudentFilters {
   search?: string;
-  verified?: boolean;
-  is_banned?: boolean;
+  email?: string; // Search specifically by email or nickname only
+  nickname?: string; // Search specifically by email or nickname only
+  phone_number?: string; // Search specifically by phone number
+  verified?: string;
+  is_banned?: string;
   student_level?: string; // Filter by enum: HIGHSCHOOL, UNIVERSITY, MASTER, PHD
   majorId?: number; // Filter by major ID
   country?: string;
+  deleted?: boolean;
   nationality?: string;
   gender?: string; // Filter by enum: MALE, FEMALE, OTHER
-  has_requests?: boolean;
+  has_requests?: string;
   sign_in_method?: 'manual' | 'facebook' | 'google' | 'apple';
   min_spend?: number;
   max_spend?: number;

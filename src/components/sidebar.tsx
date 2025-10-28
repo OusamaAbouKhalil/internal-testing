@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { 
@@ -119,6 +119,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { user, logout, hasPermission } = useFirebaseAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = async () => {
     try {
@@ -133,6 +134,7 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   const handleNavigation = (href: string) => {
+    console.log('Navigating to:', href); // Debug log
     router.push(href);
     setIsMobileOpen(false); // Close mobile menu after navigation
   };
@@ -204,20 +206,25 @@ export function Sidebar({ className }: SidebarProps) {
           ).map((item) => {
             const Icon = item.icon;
             const isLogout = item.name === "Logout";
-            const isActive = typeof window !== 'undefined' && window.location.pathname === item.href;
+            const isActive = pathname === item.href;
             const isCustomerSupport = item.name === "Customer Support";
             
             return (
               <button
                 key={item.name}
-                onClick={() => isLogout ? handleLogout() : handleNavigation(item.href)}
+                type="button"
+                onClick={() => {
+                  console.log('Button clicked:', item.name, item.href); // Debug log
+                  isLogout ? handleLogout() : handleNavigation(item.href);
+                }}
                 className={cn(
                   "group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 w-full text-left relative",
+                  "hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                   isActive 
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg" 
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg hover:bg-sidebar-primary hover:text-sidebar-primary-foreground" 
                     : isLogout 
                       ? "text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
+                      : "text-sidebar-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
                   "cursor-pointer"
                 )}
@@ -228,10 +235,10 @@ export function Sidebar({ className }: SidebarProps) {
                 )}
                 
                 <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
+                  "flex items-center justify-center w-8 h-8 rounded-lg transition-colors duration-200",
                   isActive 
                     ? "bg-transparent" 
-                    : "bg-sidebar-accent"
+                    : "bg-sidebar-accent group-hover:bg-sidebar-accent/80"
                 )}>
                   <Icon 
                     className={cn(
@@ -239,8 +246,8 @@ export function Sidebar({ className }: SidebarProps) {
                       isActive 
                         ? "text-sidebar-primary-foreground" 
                         : isLogout 
-                          ? "text-red-500"
-                          : "text-sidebar-foreground"
+                          ? "text-red-500 group-hover:text-red-400"
+                          : "text-sidebar-foreground group-hover:text-sidebar-foreground"
                     )} 
                   />
                 </div>

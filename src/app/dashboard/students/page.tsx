@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingOverlay, LoadingButton } from "@/components/ui/loading-spinner";
 import { StatusBadge, NotificationBadge } from "@/components/ui/status-badge";
 import { EnhancedStudentDialog } from "@/components/enhanced-student-dialog";
+import { PaginationAdvanced } from "@/components/pagination.advanced";
 import { 
   GraduationCap, 
   Plus, 
@@ -71,14 +72,19 @@ export default function StudentsPage() {
     loading, 
     error, 
     totalCount,
+    totalPages,
     hasMore,
+    currentPage,
+    perPage,
     fetchStudents, 
     createStudent, 
     updateStudent, 
     deleteStudent,
     toggleVerification,
     importStudents,
-    resetPagination
+    resetPagination,
+    setCurrentPage,
+    setPerPage
   } = useStudentManagementStore();
 
   const { hasPermission } = useFirebaseAuthStore();
@@ -90,6 +96,27 @@ export default function StudentsPage() {
     fetchLanguages();
     fetchSubjects();
   }, []);
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+    setCurrentPage(newPage);
+    fetchStudents(filters, newPage);
+  };
+
+  // Handle per page change
+  const handlePerPageChange = (newPerPage: number) => {
+    setPerPage(newPerPage);
+    const searchFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters
+    };
+    resetPagination();
+    fetchStudents(searchFilters, 1, 'first');
+  };
 
   // Debounce search term (500ms delay)
   useEffect(() => {
@@ -175,7 +202,7 @@ export default function StudentsPage() {
       ...filters
     };
     resetPagination();
-    fetchStudents(searchFilters);
+    fetchStudents(searchFilters, 1, 'first');
   }, [debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, filters]);
 
   const handleTabChange = (tab: 'all' | 'verified' | 'not_verified' | 'deleted' | 'banned') => {
@@ -227,10 +254,6 @@ export default function StudentsPage() {
     setSelectedStudent(student);
     setIsEditDialogOpen(true);
   }, []);
-
-  const handleLoadMore = () => {
-    fetchStudents(filters, true);
-  };
 
   const handleImportStudents = async () => {
     try {
@@ -447,6 +470,36 @@ export default function StudentsPage() {
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {students.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
+          </div>
         )}
 
         {/* Students Grid */}
@@ -676,7 +729,14 @@ export default function StudentsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>Joined {new Date(student.created_at).toLocaleDateString()}</span>
+                      <span>
+                        Joined{" "}
+                        {typeof student.created_at === "object" && (student?.created_at as any)?._seconds
+                          ? new Date((student?.created_at as any)?._seconds * 1000).toLocaleDateString()
+                          : student?.created_at
+                          ? new Date(student.created_at).toLocaleDateString()
+                          : "Unknown"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       {student?.sign_in_methods?.length && student?.sign_in_methods?.length > 0 && student?.sign_in_methods?.map((method) => (
@@ -694,12 +754,33 @@ export default function StudentsPage() {
           </div>
         </LoadingOverlay>
 
-        {/* Load More Button */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleLoadMore} disabled={loading}>
-              Load More Students
-            </Button>
+        {/* Pagination Controls - Bottom */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select-bottom">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select-bottom" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {students.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
           </div>
         )}
 

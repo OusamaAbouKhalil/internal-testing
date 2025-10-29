@@ -162,4 +162,6 @@ export interface StudentFilters {
   sign_in_method?: 'manual' | 'facebook' | 'google' | 'apple';
   min_spend?: number;
   max_spend?: number;
+  page?: number;
+  limit?: number;
 }

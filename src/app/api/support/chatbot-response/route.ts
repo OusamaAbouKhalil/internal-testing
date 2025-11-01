@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare OpenAI request
     const openaiRequestData = {
-      model: 'gpt-3.5-turbo', // You can use your fine-tuned model here
+      model: 'ft:gpt-3.5-turbo-0125:our-easy-game-tutoring-llc:oeg-app-v1:9G55FiRe', // You can use your fine-tuned model here
       max_tokens: 150,
       temperature: 0.3,
       messages: [

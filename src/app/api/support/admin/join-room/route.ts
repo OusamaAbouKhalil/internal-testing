@@ -30,9 +30,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update room with admin_id
+    // Update room with admin_id and set with_agent to true
     await adminDb.collection('support_rooms').doc(room_id).update({
       admin_id: admin_id,
+      with_agent: true,
       updated_at: FieldValue.serverTimestamp()
     });
 

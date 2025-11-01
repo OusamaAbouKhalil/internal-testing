@@ -1210,8 +1210,6 @@ export function CustomerSupportUI({
                 <Textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 resize-none"
                   placeholder={isAgentConnected ? "Type your message..." : "Join the chat to start messaging"}
                   className="flex-1 bg-background border-input placeholder-muted-foreground resize-none"
                   rows={1}
@@ -1231,22 +1229,24 @@ export function CustomerSupportUI({
                 </Button>
               </div>
               {!isAgentConnected && (
-                <div className="mt-3 bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
-                  <div className="flex items-start space-x-2">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-300">Quick Chat Mode</p>
-                      <p className="text-xs text-blue-400 mt-1">You can send messages directly to the user without formally joining as an agent. This allows for quick responses while maintaining conversation context.</p>
+                <>
+                  <div className="mt-3 bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
+                    <div className="flex items-start space-x-2">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-300">Quick Chat Mode</p>
+                        <p className="text-xs text-blue-400 mt-1">You can send messages directly to the user without formally joining as an agent. This allows for quick responses while maintaining conversation context.</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Join the chat to start messaging with the user
-                </p>
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    Join the chat to start messaging with the user
+                  </p>
+                </>
               )}
             </div>
           </>

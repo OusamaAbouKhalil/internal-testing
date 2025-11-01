@@ -904,21 +904,21 @@ export function CustomerSupportUI({
   }, [messages]);
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-gray-900 text-white overflow-hidden rounded-lg">
+    <div className="flex h-[calc(100vh-12rem)] bg-background overflow-hidden rounded-lg">
       {/* Left Panel - Conversation List */}
-      <div className="w-1/3 border-r border-gray-700 bg-gray-800 flex flex-col">
+      <div className="w-1/3 border-r border-border bg-card flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-lg font-semibold mb-4">Student Support</h2>
           
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              className="pl-10 bg-background border-input placeholder-muted-foreground"
             />
           </div>
         </div>
@@ -931,7 +931,7 @@ export function CustomerSupportUI({
               className={`flex-1 px-4 py-3 text-sm font-medium ${
                 activeTab === 'Student' 
                   ? 'text-purple-400 border-b-2 border-purple-400' 
-                  : 'text-gray-400 hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Student
@@ -941,7 +941,7 @@ export function CustomerSupportUI({
               className={`flex-1 px-4 py-3 text-sm font-medium ${
                 activeTab === 'Tutor' 
                   ? 'text-purple-400 border-b-2 border-purple-400' 
-                  : 'text-gray-400 hover:text-white'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               Tutor
@@ -963,7 +963,7 @@ export function CustomerSupportUI({
               </Alert>
             </div>
           ) : filteredRooms.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">
+            <div className="p-4 text-center text-muted-foreground">
               No {activeTab.toLowerCase()} conversations found
             </div>
           ) : (
@@ -978,13 +978,13 @@ export function CustomerSupportUI({
                       loadMessages(room.id);
                     }
                   }}
-                  className={`p-4 cursor-pointer hover:bg-gray-700 transition-colors ${
+                  className={`p-4 cursor-pointer hover:bg-accent transition-colors ${
                     selectedRoom?.id === room.id ? 'bg-purple-900 text-purple-100' : ''
                   } ${loadingMessages ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   <div className="flex items-start space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gray-600">
+                      <AvatarFallback className="bg-muted">
                         {room.user_type === 'student' ? (
                           <User className="h-5 w-5" />
                         ) : (
@@ -1004,11 +1004,11 @@ export function CustomerSupportUI({
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-gray-400 truncate">
+                      <p className="text-xs text-muted-foreground truncate">
                         {getUserDisplayMessage(room)}
                       </p>
                       <p 
-                        className="text-xs text-gray-500 cursor-help" 
+                        className="text-xs text-muted-foreground cursor-help" 
                         title={room.latestMessage ? formatFullTime(room.latestMessage.created_at) : 'No messages'}
                       >
                         {room.latestMessage ? formatRoomTime(room.latestMessage.created_at) : 'No messages'}
@@ -1027,11 +1027,11 @@ export function CustomerSupportUI({
         {selectedRoom ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-700 bg-gray-800">
+            <div className="p-4 border-b border-border bg-card">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gray-600">
+                      <AvatarFallback className="bg-muted">
                         {selectedRoom.user_type === 'student' ? (
                           <User className="h-5 w-5" />
                         ) : (
@@ -1041,7 +1041,7 @@ export function CustomerSupportUI({
                     </Avatar>
                     <div>
                       <h3 className="font-medium">{getUserDisplayName(selectedRoom)}</h3>
-                      <div className="flex items-center space-x-4 text-xs text-gray-400">
+                      <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                         {selectedRoom.user_type === 'student' && selectedRoom.student?.email && (
                           <div className="flex items-center space-x-1">
                             <Mail className="h-3 w-3" />
@@ -1128,10 +1128,10 @@ export function CustomerSupportUI({
               {loadingMessages ? (
                 <div className="flex items-center justify-center py-8">
                   <LoadingSpinner />
-                  <span className="ml-2 text-gray-400">Loading messages...</span>
+                  <span className="ml-2 text-muted-foreground">Loading messages...</span>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="text-center text-gray-400 py-8">
+                <div className="text-center text-muted-foreground py-8">
                   No messages yet. Start the conversation!
                 </div>
               ) : (
@@ -1146,10 +1146,10 @@ export function CustomerSupportUI({
                   ].includes(message.message_type as CustomerSupportMessageType)) {
                     return (
                       <div key={message.id} className="flex justify-center">
-                        <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 max-w-[80%]">
+                        <div className="bg-card border border-border rounded-lg p-3 max-w-[80%]">
                           {renderMessageContent(message)}
                           <p 
-                            className="text-xs text-gray-400 mt-1 text-center cursor-help" 
+                            className="text-xs text-muted-foreground mt-1 text-center cursor-help" 
                             title={formatFullTime(message.created_at)}
                           >
                             {formatMessageTime(message.created_at)}
@@ -1175,14 +1175,14 @@ export function CustomerSupportUI({
                         <div className={`rounded-lg p-3 ${
                           message.user_type === 'admin' 
                             ? 'bg-purple-600 text-white' 
-                            : 'bg-gray-700 text-white'
+                            : 'bg-muted'
                         }`}>
                           {renderMessageContent(message)}
                           <p 
                             className={`text-xs mt-1 cursor-help ${
                               message.user_type === 'admin' 
                                 ? 'text-purple-200' 
-                                : 'text-gray-400'
+                                : 'text-muted-foreground'
                             }`}
                             title={formatFullTime(message.created_at)}
                           >
@@ -1205,13 +1205,15 @@ export function CustomerSupportUI({
             </div>
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-700 bg-gray-800">
+            <div className="p-4 border-t border-border bg-card">
               <div className="flex space-x-2">
                 <Textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1 bg-gray-700 border-gray-600 text-white placeholder-gray-400 resize-none"
+                  placeholder={isAgentConnected ? "Type your message..." : "Join the chat to start messaging"}
+                  className="flex-1 bg-background border-input placeholder-muted-foreground resize-none"
                   rows={1}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1242,13 +1244,16 @@ export function CustomerSupportUI({
                     </div>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Join the chat to start messaging with the user
+                </p>
               )}
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
-              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+              <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg">Select a conversation to start chatting</p>
             </div>
           </div>

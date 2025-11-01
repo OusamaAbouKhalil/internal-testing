@@ -233,9 +233,9 @@ export default function StudentsPage() {
       case 'google':
         return <Globe className="h-4 w-4 text-red-500" />;
       case 'apple':
-        return <Apple className="h-4 w-4 text-gray-800" />;
+        return <Apple className="h-4 w-4 text-foreground" />;
       default:
-        return <User className="h-4 w-4 text-gray-600" />;
+        return <User className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -258,9 +258,9 @@ export default function StudentsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-white">Students</h1>
-            <p className="text-gray-300 mt-2">Manage student accounts and information</p>
-            <p className="text-sm text-gray-400 mt-1">Total: {totalCount} students</p>
+            <h1 className="text-3xl font-bold">Students</h1>
+            <p className="text-muted-foreground mt-2">Manage student accounts and information</p>
+            <p className="text-sm text-muted-foreground mt-1">Total: {totalCount} students</p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -289,7 +289,7 @@ export default function StudentsPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         This will import all students from the students.json file.
                       </p>
                       <div className="flex justify-end space-x-2">
@@ -320,7 +320,7 @@ export default function StudentsPage() {
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search by name, email, phone, major, country, requests, sign-in method, spend amount, etc..."
                 value={searchTerm}
@@ -334,9 +334,9 @@ export default function StudentsPage() {
           </div>
 
           {showFilters && (
-            <Card className="bg-gray-800 border-gray-700">
+            <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-white">Filters</CardTitle>
+                <CardTitle className="text-lg">Filters</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -529,12 +529,12 @@ export default function StudentsPage() {
         <LoadingOverlay loading={loading}>
           <div className="grid gap-4">
             {students.map((student) => (
-              <Card key={student.id} className="transition-all duration-200 hover:shadow-md bg-gray-800 border-gray-700">
+              <Card key={student.id} className="transition-all duration-200 hover:shadow-md">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-600 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex items-center justify-center">
                           <img 
                             src={getStudentProfileImageUrl(student)} 
                             alt={student.full_name || 'Student'} 
@@ -554,17 +554,17 @@ export default function StudentsPage() {
                           </div>
                         </div>
                         <div className="flex-1">
-                          <CardTitle className="flex items-center gap-2 mb-1 text-white">
+                          <CardTitle className="flex items-center gap-2 mb-1">
                             <GraduationCap className="h-5 w-5" />
                             {student.full_name || 'No Name'}
                           </CardTitle>
                           {student.nickname && student.nickname !== student.full_name && (
-                            <p className="text-sm text-gray-300 mb-1 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                               <UserCircle className="h-3 w-3" />
                               @{student.nickname}
                             </p>
                           )}
-                          <CardDescription className="flex items-center gap-4 mt-1 text-gray-300">
+                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Mail className="h-4 w-4" />
                               {student.email}
@@ -597,7 +597,7 @@ export default function StudentsPage() {
                             className={
                               student.verified === '1'
                                 ? "hover:bg-green-50 hover:border-green-200 text-green-600 border-green-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={student.verified === '1' ? 'Unverify student' : 'Verify student'}
                           >
@@ -642,7 +642,7 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
                   {student.student_level && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <BookOpen className="h-3 w-3" />
                         Level
                       </h4>
@@ -652,7 +652,7 @@ export default function StudentsPage() {
                   
                   {(student.majorId || student.otherMajor) && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <GraduationCap className="h-3 w-3" />
                         Major
                       </h4>
@@ -664,7 +664,7 @@ export default function StudentsPage() {
                   
                   {student.country && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         Location
                       </h4>
@@ -675,7 +675,7 @@ export default function StudentsPage() {
                   )}
                   
                   <div>
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
                       Requests
                     </h4>
@@ -684,7 +684,7 @@ export default function StudentsPage() {
                   
                   {student.spend_amount !== undefined && student.spend_amount > 0 && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
                         Spent
                       </h4>
@@ -696,7 +696,7 @@ export default function StudentsPage() {
                   
                   {student.rating !== undefined && student.rating > 0 && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <Star className="h-3 w-3" />
                         Rating
                       </h4>
@@ -708,7 +708,7 @@ export default function StudentsPage() {
                   
                   {student.nationality && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <User className="h-3 w-3" />
                         Nationality
                       </h4>
@@ -718,7 +718,7 @@ export default function StudentsPage() {
                   
                   {student.gender && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <UserCircle className="h-3 w-3" />
                         Gender
                       </h4>
@@ -730,7 +730,7 @@ export default function StudentsPage() {
                 {/* Languages Section - Full Width */}
                 {getStudentLanguages(student).length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <Languages className="h-3 w-3" />
                       Languages
                     </h4>
@@ -750,11 +750,11 @@ export default function StudentsPage() {
                 
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       <span>Joined {new Date(student.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       {getSignInMethodIcon(student.sign_in_method)}
                       <span>{getSignInMethodLabel(student.sign_in_method)}</span>
                     </div>
@@ -779,9 +779,9 @@ export default function StudentsPage() {
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="text-center">
-                <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No students found</h3>
-                <p className="text-gray-400 mb-4">
+                <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No students found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm || Object.keys(filters).length > 0 
                     ? 'No students match your search criteria.' 
                     : 'Students will appear here once they are added to the system.'

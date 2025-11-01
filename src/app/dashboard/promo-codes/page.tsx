@@ -145,7 +145,7 @@ export default function PromoCodesPage() {
       case 'EVENT':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -155,9 +155,9 @@ export default function PromoCodesPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Promo Codes</h1>
-            <p className="text-gray-600 mt-2">Manage promotional codes and discounts</p>
-            <p className="text-sm text-gray-500 mt-1">Total: {totalCount} promo codes</p>
+            <h1 className="text-3xl font-bold text-foreground">Promo Codes</h1>
+            <p className="text-muted-foreground mt-2">Manage promotional codes and discounts</p>
+            <p className="text-sm text-muted-foreground mt-1">Total: {totalCount} promo codes</p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -185,7 +185,7 @@ export default function PromoCodesPage() {
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search by code, description, or discount..."
                 value={searchTerm}
@@ -308,7 +308,7 @@ export default function PromoCodesPage() {
                               Active
                             </Badge>
                           ) : (
-                            <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+                            <Badge className="bg-muted text-foreground">
                               Inactive
                             </Badge>
                           )}
@@ -385,7 +385,7 @@ export default function PromoCodesPage() {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                           <Percent className="h-3 w-3" />
                           Discount
                         </h4>
@@ -393,7 +393,7 @@ export default function PromoCodesPage() {
                       </div>
                       
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                           <TrendingUp className="h-3 w-3" />
                           Usage
                         </h4>
@@ -413,7 +413,7 @@ export default function PromoCodesPage() {
                       </div>
                       
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                           <Users className="h-3 w-3" />
                           Per User Limit
                         </h4>
@@ -421,7 +421,7 @@ export default function PromoCodesPage() {
                       </div>
                       
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           Created
                         </h4>
@@ -450,9 +450,9 @@ export default function PromoCodesPage() {
           <Card>
             <CardContent className="p-6">
               <div className="text-center">
-                <Ticket className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No promo codes found</h3>
-                <p className="text-gray-500 mb-4">
+                <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No promo codes found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm || Object.keys(filters).length > 0 
                     ? 'No promo codes match your search criteria.' 
                     : 'Create your first promo code to offer discounts to your users.'
@@ -502,9 +502,9 @@ export default function PromoCodesPage() {
             <div className="space-y-4">
               {selectedPromoCodeUsage.length === 0 ? (
                 <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No usage recorded</h3>
-                  <p className="text-gray-500">This promo code hasn't been used by anyone yet.</p>
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-foreground mb-2">No usage recorded</h3>
+                  <p className="text-muted-foreground">This promo code hasn't been used by anyone yet.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -518,13 +518,13 @@ export default function PromoCodesPage() {
                       <table className="w-full">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Student ID
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Email
                             </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Times Used
                             </th>
                             
@@ -533,13 +533,13 @@ export default function PromoCodesPage() {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {selectedPromoCodeUsage.map((usage) => (
                             <tr key={usage.student_id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900 font-mono">
+                              <td className="px-4 py-3 text-sm text-foreground font-mono">
                                 {usage.student_id}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-foreground">
                                 {usage.email}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">
+                              <td className="px-4 py-3 text-sm text-foreground">
                                 <Badge variant="outline" className="font-mono">
                                   {usage.number_of_usage}
                                 </Badge>

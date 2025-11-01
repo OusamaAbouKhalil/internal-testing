@@ -138,7 +138,7 @@ export function NotificationsDialog({ isOpen, onClose }: NotificationsDialogProp
       case 'admin':
         return 'bg-purple-100 text-purple-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -215,7 +215,7 @@ export function NotificationsDialog({ isOpen, onClose }: NotificationsDialogProp
                     key={notification.id}
                     className={`p-3 rounded-lg border transition-colors cursor-pointer hover:shadow-md ${
                       notification.seen 
-                        ? 'bg-gray-50 border-gray-200 hover:bg-gray-100' 
+                        ? 'bg-muted border-border hover:bg-muted/80' 
                         : 'bg-blue-50 border-blue-200 hover:bg-blue-100'
                     }`}
                     onClick={() => handleNotificationClick(notification)}
@@ -235,25 +235,25 @@ export function NotificationsDialog({ isOpen, onClose }: NotificationsDialogProp
                           )}
                         </div>
                         
-                        <p className="text-sm text-gray-900 mb-2">
+                        <p className="text-sm text-foreground mb-2">
                           {notification.content}
                         </p>
 
                         {/* Request Information */}
                         {notification.requestId && (
-                          <div className="mb-2 p-2 bg-gray-100 rounded-md">
+                          <div className="mb-2 p-2 bg-muted rounded-md">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <FileText className="h-3 w-3" />
                                 <span className="font-medium">Request:</span>
                                 {isLoadingRequest ? (
-                                  <span className="text-gray-500">Loading...</span>
+                                  <span className="text-muted-foreground">Loading...</span>
                                 ) : request ? (
-                                  <span className="text-gray-900">
+                                  <span className="text-foreground">
                                     {request.subject || request.title || `Request #${notification.requestId.slice(-8)}`}
                                   </span>
                                 ) : (
-                                  <span className="text-gray-500">Request #{notification.requestId.slice(-8)}</span>
+                                  <span className="text-muted-foreground">Request #{notification.requestId.slice(-8)}</span>
                                 )}
                               </div>
                               <Button
@@ -270,7 +270,7 @@ export function NotificationsDialog({ isOpen, onClose }: NotificationsDialogProp
                               </Button>
                             </div>
                             {request && (
-                              <div className="mt-1 text-xs text-gray-500">
+                              <div className="mt-1 text-xs text-muted-foreground">
                                 {request.assistance_type && (
                                   <span className="mr-2">Type: {request.assistance_type}</span>
                                 )}

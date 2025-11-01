@@ -10,7 +10,10 @@ import {
   query,
   where,
   orderBy,
-  limit
+  limit,
+  startAfter,
+  DocumentSnapshot,
+  QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { 
@@ -18,7 +21,8 @@ import {
   TutorOffer,
   CreateRequestData,
   UpdateRequestData,
-  RequestFilters
+  RequestFilters,
+  PaginationParams
 } from '@/types/request';
 import { combineDateAndTime, dateToTimestamp } from '@/lib/date-utils';
 
@@ -29,9 +33,23 @@ interface RequestManagementStore {
   loading: boolean;
   error: string | null;
   selectedRequest: Request | null;
+  
+  // Pagination state
+  currentPage: number;
+  pageSize: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  totalItems: number;
+  lastVisibleDoc: QueryDocumentSnapshot | null;
+  firstVisibleDoc: QueryDocumentSnapshot | null;
+  pageCache: Map<number, { docs: QueryDocumentSnapshot[], requests: Request[] }>;
 
   // CRUD Actions
-  fetchRequests: (filters?: RequestFilters) => Promise<void>;
+  fetchRequests: (filters?: RequestFilters, pagination?: PaginationParams) => Promise<void>;
+  fetchNextPage: (filters?: RequestFilters) => Promise<void>;
+  fetchPreviousPage: (filters?: RequestFilters) => Promise<void>;
+  goToPage: (page: number, filters?: RequestFilters) => Promise<void>;
+  setPageSize: (pageSize: number) => void;
   fetchRequestById: (requestId: string) => Promise<Request | null>;
   createRequest: (requestData: CreateRequestData) => Promise<void>;
   updateRequest: (requestId: string, requestData: UpdateRequestData) => Promise<void>;
@@ -86,15 +104,49 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
   loading: false,
   error: null,
   selectedRequest: null,
+  
+  // Pagination initial state
+  currentPage: 1,
+  pageSize: 20,
+  hasNextPage: false,
+  hasPreviousPage: false,
+  totalItems: 0,
+  lastVisibleDoc: null,
+  firstVisibleDoc: null,
+  pageCache: new Map(),
 
-  // Fetch requests with optional filters
-  fetchRequests: async (filters = {}) => {
+  // Fetch requests with optional filters and pagination
+  fetchRequests: async (filters = {}, pagination) => {
     try {
+      const state = get();
       set({ loading: true, error: null });
       
-      let q = query(collection(db, 'requests'), orderBy('created_at', 'desc'));
-      console.log("filters.assistance_type: " + filters.assistance_type);
-      // Apply filters
+      // Reset to page 1 if not specified
+      const targetPage = pagination?.page || 1;
+      const currentPageSize = pagination?.pageSize || state.pageSize;
+      
+      // Check cache first for the exact page
+      const cachedPage = state.pageCache.get(targetPage);
+      if (cachedPage && !pagination?.lastVisible) {
+        set({
+          requests: cachedPage.requests,
+          currentPage: targetPage,
+          hasPreviousPage: targetPage > 1,
+          loading: false,
+          firstVisibleDoc: cachedPage.docs[0] || null,
+          lastVisibleDoc: cachedPage.docs[cachedPage.docs.length - 1] || null
+        });
+        return;
+      }
+      
+      // Build base query
+      let q = query(
+        collection(db, 'requests'), 
+        orderBy('created_at', 'desc'),
+        limit(currentPageSize + 1) // Fetch one extra to check if there's a next page
+      );
+      
+      // Apply Firestore filters
       if (filters.assistance_type) {
         q = query(q, where('assistance_type', '==', filters.assistance_type));
       }
@@ -123,8 +175,19 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         q = query(q, where('tutor_id', '==', filters.tutor_id));
       }
       
+      // Add pagination cursor if provided
+      if (pagination?.lastVisible) {
+        q = query(q, startAfter(pagination.lastVisible));
+      }
+      
       const querySnapshot = await getDocs(q);
-      const requests = querySnapshot.docs.map(doc => ({
+      const docs = querySnapshot.docs;
+      
+      // Check if there's a next page
+      const hasMore = docs.length > currentPageSize;
+      const requestDocs = hasMore ? docs.slice(0, currentPageSize) : docs;
+      
+      const requests = requestDocs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
@@ -160,7 +223,21 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         });
       }
       
-      set({ requests: filteredRequests, loading: false });
+      // Cache the page
+      const newCache = new Map(state.pageCache);
+      newCache.set(targetPage, { docs: requestDocs, requests: filteredRequests });
+      
+      set({ 
+        requests: filteredRequests,
+        currentPage: targetPage,
+        pageSize: currentPageSize,
+        hasNextPage: hasMore,
+        hasPreviousPage: targetPage > 1,
+        firstVisibleDoc: requestDocs[0] || null,
+        lastVisibleDoc: requestDocs[requestDocs.length - 1] || null,
+        pageCache: newCache,
+        loading: false 
+      });
     } catch (error: any) {
       console.error('Error fetching requests:', error);
       set({ 
@@ -168,6 +245,49 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         loading: false 
       });
     }
+  },
+  
+  // Fetch next page
+  fetchNextPage: async (filters = {}) => {
+    const state = get();
+    if (!state.hasNextPage || state.loading) return;
+    
+    await get().fetchRequests(filters, {
+      page: state.currentPage + 1,
+      pageSize: state.pageSize,
+      lastVisible: state.lastVisibleDoc
+    });
+  },
+  
+  // Fetch previous page
+  fetchPreviousPage: async (filters = {}) => {
+    const state = get();
+    if (!state.hasPreviousPage || state.loading) return;
+    
+    const prevPage = state.currentPage - 1;
+    await get().fetchRequests(filters, {
+      page: prevPage,
+      pageSize: state.pageSize
+    });
+  },
+  
+  // Go to specific page
+  goToPage: async (page: number, filters = {}) => {
+    const state = get();
+    if (page < 1 || state.loading) return;
+    
+    await get().fetchRequests(filters, {
+      page,
+      pageSize: state.pageSize
+    });
+  },
+  
+  // Set page size
+  setPageSize: (pageSize: number) => {
+    set({ 
+      pageSize,
+      pageCache: new Map() // Clear cache when page size changes
+    });
   },
 
   // Fetch single request by ID
@@ -271,7 +391,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await addDoc(collection(db, 'requests'), newRequest);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error creating request:', error);
@@ -308,7 +428,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error updating request:', error);
@@ -327,7 +447,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await deleteDoc(doc(db, 'requests', requestId));
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error deleting request:', error);
@@ -366,7 +486,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error changing request status:', error);
@@ -392,7 +512,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error assigning tutor:', error);
@@ -416,7 +536,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error assigning student:', error);
@@ -439,7 +559,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error setting tutor price:', error);
@@ -462,7 +582,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error setting student price:', error);
@@ -487,7 +607,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error cancelling request:', error);
@@ -516,7 +636,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error completing request:', error);
@@ -539,7 +659,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         updated_at: new Date().toISOString()
       });
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error updating request files:', error);
@@ -574,7 +694,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       const data = await response.json();
       
       if (data.success) {
-        set({ loading: false });
+        set({ loading: false, pageCache: new Map() }); // Clear cache
         get().fetchRequests(); // Refresh the list
       } else {
         throw new Error(data.error || 'Failed to update tutor payment status');

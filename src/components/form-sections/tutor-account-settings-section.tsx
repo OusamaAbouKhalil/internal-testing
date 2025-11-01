@@ -33,7 +33,7 @@ export default function TutorAccountSettingsSection({
                 <Shield className="h-4 w-4 text-green-600" />
                 Verified
               </Label>
-              <p className="text-xs text-gray-500">Tutor verification status</p>
+              <p className="text-xs text-muted-foreground">Tutor verification status</p>
             </div>
             <Switch
               id="verified"
@@ -48,7 +48,7 @@ export default function TutorAccountSettingsSection({
                 <Bell className="h-4 w-4 text-blue-600" />
                 Notifications
               </Label>
-              <p className="text-xs text-gray-500">Send push notifications to tutor</p>
+              <p className="text-xs text-muted-foreground">Send push notifications to tutor</p>
             </div>
             <Switch
               id="send_notifications"
@@ -63,7 +63,7 @@ export default function TutorAccountSettingsSection({
                 <Lock className="h-4 w-4 text-orange-600" />
                 Locked
               </Label>
-              <p className="text-xs text-gray-500">Temporarily lock tutor account</p>
+              <p className="text-xs text-muted-foreground">Temporarily lock tutor account</p>
             </div>
             <Switch
               id="locked"
@@ -75,10 +75,10 @@ export default function TutorAccountSettingsSection({
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <div>
               <Label htmlFor="cancelled" className="text-sm font-medium flex items-center gap-2">
-                <X className="h-4 w-4 text-gray-600" />
+                <X className="h-4 w-4 text-muted-foreground" />
                 Cancelled
               </Label>
-              <p className="text-xs text-gray-500">Mark tutor account as cancelled</p>
+              <p className="text-xs text-muted-foreground">Mark tutor account as cancelled</p>
             </div>
             <Switch
               id="cancelled"

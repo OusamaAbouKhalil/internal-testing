@@ -169,7 +169,7 @@ export default function RequestDetailPage() {
     switch (status?.toLowerCase()) {
       case 'new':
       case 'pending':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
       case 'pending_payment':
         return 'bg-blue-100 text-blue-800';
       case 'ongoing':
@@ -181,7 +181,7 @@ export default function RequestDetailPage() {
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 

@@ -135,9 +135,9 @@ function TutorSearchComponent({
                 </Badge>
               </div>
               <div className="font-medium mt-1">{currentTutor.full_name}</div>
-              <div className="text-sm text-gray-600">{currentTutor.email}</div>
+              <div className="text-sm text-muted-foreground">{currentTutor.email}</div>
               {currentTutor.country && (
-                <div className="text-xs text-gray-500">{currentTutor.country}</div>
+                <div className="text-xs text-muted-foreground">{currentTutor.country}</div>
               )}
             </div>
             <Badge variant={currentTutor.verified === '2' ? 'default' : 'secondary'}>
@@ -151,7 +151,7 @@ function TutorSearchComponent({
         <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
           <div className="flex items-center gap-2">
             <LoadingSpinner />
-            <span className="text-sm text-gray-600">Loading current tutor...</span>
+            <span className="text-sm text-muted-foreground">Loading current tutor...</span>
           </div>
         </div>
       )}
@@ -176,9 +176,9 @@ function TutorSearchComponent({
                       </Badge>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">{tutor.email}</div>
+                  <div className="text-sm text-muted-foreground">{tutor.email}</div>
                   {tutor.country && (
-                    <div className="text-xs text-gray-500">{tutor.country}</div>
+                    <div className="text-xs text-muted-foreground">{tutor.country}</div>
                   )}
                 </div>
                 <Badge variant={tutor.verified === '2' ? 'default' : 'secondary'}>
@@ -192,7 +192,7 @@ function TutorSearchComponent({
 
       {showResults && searchResults.length === 0 && searchTerm.length >= 3 && !isSearching && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-          <div className="text-sm text-gray-500">No tutors found with that email</div>
+          <div className="text-sm text-muted-foreground">No tutors found with that email</div>
         </div>
       )}
     </div>
@@ -233,9 +233,9 @@ export function AssignmentManagement({
             <div className="flex justify-between items-start">
               <div>
                 <div className="font-medium">{selectedTutor.full_name}</div>
-                <div className="text-sm text-gray-600">{selectedTutor.email}</div>
+                <div className="text-sm text-muted-foreground">{selectedTutor.email}</div>
                 {selectedTutor.country && (
-                  <div className="text-xs text-gray-500">{selectedTutor.country}</div>
+                  <div className="text-xs text-muted-foreground">{selectedTutor.country}</div>
                 )}
               </div>
               <Badge variant={selectedTutor.verified === '2' ? 'default' : 'secondary'}>

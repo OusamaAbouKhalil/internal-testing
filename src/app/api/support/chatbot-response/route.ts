@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const chatbotResponse = { id: messageRef.id, ...messageData };
 
     // Get target user for notification
-    let targetUser = null;
+    let targetUser: any = null;
     
     if (roomData?.user_type === 'student' && roomData?.user_id) {
       const studentDoc = await adminDb.collection('students').doc(roomData.user_id).get();

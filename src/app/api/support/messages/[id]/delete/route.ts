@@ -58,13 +58,13 @@ export async function DELETE(
         body: message,
         room_id: roomId,
         message_id: messageId,
-        sender_id: messageData.sender_id,
+        sender_id: messageData?.sender_id,
         user_type: userType,
         type: 'delete_message_support'
       });
     } else {
       // Send notification to student/tutor
-      let targetUser = null;
+      let targetUser: any = null;
       
       if (roomData?.user_type === 'student' && roomData?.user_id) {
         const studentDoc = await adminDb.collection('students').doc(roomData.user_id).get();

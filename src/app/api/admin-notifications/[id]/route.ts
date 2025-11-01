@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // PUT /api/admin-notifications/[id] - Update a notification
 export async function PUT(
@@ -12,7 +13,7 @@ export async function PUT(
 
     const updateData = {
       ...data,
-      updatedAt: adminDb.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     };
 
     await adminDb.collection('admin_notifications').doc(id).update(updateData);

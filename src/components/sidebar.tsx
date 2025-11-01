@@ -100,6 +100,12 @@ const getNavigationItems = (hasPermission: (resource: string, action: string) =>
     permission: { resource: 'users', action: 'read' } 
   },
   { 
+    name: "Resources", 
+    href: "/dashboard/resources", 
+    icon: Database, 
+    permission: { resource: 'resources', action: 'read' } 
+  },
+  { 
     name: "Roles & Permissions", 
     href: "/dashboard/roles", 
     icon: Key, 
@@ -144,7 +150,7 @@ export function Sidebar({ className }: SidebarProps) {
           variant="outline"
           size="icon"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="bg-gray-800 border-gray-600 text-white shadow-md hover:bg-gray-700"
+          className="bg-sidebar border-sidebar-border text-sidebar-foreground shadow-md hover:bg-sidebar-accent"
         >
           {isMobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
@@ -161,7 +167,7 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          "flex flex-col bg-gray-900 transition-all duration-300 ease-in-out",
+          "flex flex-col bg-sidebar transition-all duration-300 ease-in-out",
           // Card effect with shadow and rounded corners
           "shadow-2xl rounded-r-3xl",
           // Curved from top-right to bottom-right
@@ -172,10 +178,10 @@ export function Sidebar({ className }: SidebarProps) {
           // Desktop width based on expansion
           isExpanded ? "w-64" : "w-16",
           className
-        )}
+        )}  
       >
         {/* Header */}
-        <div className="flex items-center justify-center p-4 border-b border-gray-700 bg-gradient-to-b from-gray-800 to-gray-900 rounded-tr-3xl">
+        <div className="flex items-center justify-center p-4 border-b border-border bg-gradient-to-b from-background to-card rounded-tr-3xl">
           <div 
             className="flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -185,7 +191,7 @@ export function Sidebar({ className }: SidebarProps) {
               alt="Logo"
               width={isExpanded ? 80 : 40}
               height={isExpanded ? 40 : 20}
-              className={`transition-all duration-300 ${isExpanded ? 'h-10 w-auto' : 'h-5 w-auto'}`}
+              className={`transition-all duration-300 ${isExpanded ? 'h-10 w-auto' : 'h-5 w-auto'} dark:brightness-0 dark:invert brightness-0`}
               priority
             />
           </div>
@@ -208,28 +214,33 @@ export function Sidebar({ className }: SidebarProps) {
                 className={cn(
                   "group flex items-center px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 w-full text-left relative",
                   isActive 
-                    ? "bg-blue-600 text-white shadow-lg" 
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg" 
                     : isLogout 
                       ? "text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                      : "text-white hover:bg-gray-700/50",
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50",
                   "focus:outline-none focus:ring-2 focus:ring-blue-500/50",
                   "cursor-pointer"
                 )}
               >
                 {/* Active indicator line */}
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+                  <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-sidebar-primary rounded-r-full" />
                 )}
                 
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10">
+                <div className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-lg transition-colors",
+                  isActive 
+                    ? "bg-transparent" 
+                    : "bg-sidebar-accent"
+                )}>
                   <Icon 
                     className={cn(
                       "flex-shrink-0 h-5 w-5 transition-colors duration-200",
                       isActive 
-                        ? "text-white" 
+                        ? "text-sidebar-primary-foreground" 
                         : isLogout 
-                          ? "text-red-400"
-                          : "text-white"
+                          ? "text-red-500"
+                          : "text-sidebar-foreground"
                     )} 
                   />
                 </div>

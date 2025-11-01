@@ -164,8 +164,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <p className="text-gray-300 mt-2">Welcome back! Here's what's happening today.</p>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Welcome back! Here's what's happening today.</p>
         
         {/* Test Dialog Buttons */}
         <div className="mt-4 flex gap-2 flex-wrap">
@@ -193,15 +193,15 @@ export default function DashboardPage() {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="hover:shadow-lg transition-shadow duration-200 bg-gray-800 border-gray-700">
+            <Card key={stat.title} className="hover:shadow-lg transition-shadow duration-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-300">
+                <CardTitle className="text-sm font-medium">
                   {stat.title}
                 </CardTitle>
-                <Icon className="h-4 w-4 text-gray-400" />
+                <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
+                <div className="text-2xl font-bold">{stat.value}</div>
                 <div className="flex items-center text-sm mt-1">
                   {stat.changeType === "increase" ? (
                     <ArrowUpRight className="h-4 w-4 text-green-500" />
@@ -217,7 +217,7 @@ export default function DashboardPage() {
                   >
                     {stat.change}
                   </span>
-                  <span className="text-gray-400 ml-1">from last month</span>
+                  <span className="text-muted-foreground ml-1">from last month</span>
                 </div>
               </CardContent>
             </Card>
@@ -228,23 +228,23 @@ export default function DashboardPage() {
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
-        <Card className="bg-gray-800 border-gray-700">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Recent Activity</CardTitle>
-            <CardDescription className="text-gray-300">Latest actions from your users</CardDescription>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest actions from your users</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-center justify-between p-3 bg-gray-700 rounded-lg border border-gray-600"
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg border"
                 >
                   <div>
-                    <p className="font-medium text-white">{activity.user}</p>
-                    <p className="text-sm text-gray-300">{activity.action}</p>
+                    <p className="font-medium">{activity.user}</p>
+                    <p className="text-sm text-muted-foreground">{activity.action}</p>
                   </div>
-                  <span className="text-xs text-gray-400">{activity.time}</span>
+                  <span className="text-xs text-muted-foreground">{activity.time}</span>
                 </div>
               ))}
             </div>
@@ -252,10 +252,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="bg-gray-800 border-gray-700">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Quick Actions</CardTitle>
-            <CardDescription className="text-gray-300">Common tasks you might want to perform</CardDescription>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common tasks you might want to perform</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button className="w-full justify-start" variant="outline">
@@ -279,17 +279,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Chart Placeholder */}
-      <Card className="bg-gray-800 border-gray-700">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Analytics Overview</CardTitle>
-          <CardDescription className="text-gray-300">Revenue and user growth over time</CardDescription>
+          <CardTitle>Analytics Overview</CardTitle>
+          <CardDescription>Revenue and user growth over time</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-80 bg-gray-700 rounded-lg flex items-center justify-center border border-gray-600">
+          <div className="h-80 bg-muted rounded-lg flex items-center justify-center border">
             <div className="text-center">
-              <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-              <p className="text-white">Chart component would go here</p>
-              <p className="text-sm text-gray-400">Connect your analytics library of choice</p>
+              <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
+              <p>Chart component would go here</p>
+              <p className="text-sm text-muted-foreground">Connect your analytics library of choice</p>
             </div>
           </div>
         </CardContent>

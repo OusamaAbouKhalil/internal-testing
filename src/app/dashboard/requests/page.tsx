@@ -412,7 +412,7 @@ function getRequestStatusColor(status: string): string {
   switch (status?.toLowerCase()) {
     case 'new':
     case 'pending':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
     case 'pending_payment':
       return 'bg-blue-100 text-blue-800';
     case 'ongoing':
@@ -424,7 +424,7 @@ function getRequestStatusColor(status: string): string {
     case 'cancelled':
       return 'bg-red-100 text-red-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
   }
 }
 
@@ -435,7 +435,15 @@ export default function RequestsPage() {
     loading,
     error,
     fetchRequests,
-    createRequest
+    createRequest,
+    fetchNextPage,
+    fetchPreviousPage,
+    goToPage,
+    setPageSize,
+    currentPage,
+    pageSize,
+    hasNextPage,
+    hasPreviousPage
   } = useRequestManagementStore();
 
   const [filters, setFilters] = useState<RequestFilters>({});
@@ -451,14 +459,99 @@ export default function RequestsPage() {
   }));
 
   useEffect(() => {
-    fetchRequests(filters);
-  }, [fetchRequests, filters]);
+    // Don't trigger on initial load (empty filters)
+    if (!isInitialLoad) {
+      // Reset to page 1 and clear cache when filters change
+      setPageSize(pageSize); // This clears the cache
+      fetchRequests(filters, { page: 1, pageSize });
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    // Initial load
+    if (isInitialLoad) {
+      fetchRequests({}, { page: 1, pageSize });
+      setIsInitialLoad(false);
+    }
+  }, []);
 
   const handleFilterChange = (key: keyof RequestFilters, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value || undefined
-    }));
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      if (value) {
+        newFilters[key] = value;
+      } else {
+        delete newFilters[key];
+      }
+      return newFilters;
+    });
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+  };
+
+  const handleNextPage = () => {
+    fetchNextPage(filters);
+  };
+
+  const handlePreviousPage = () => {
+    fetchPreviousPage(filters);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    fetchRequests(filters);
+  };
+
+  const handleGoToPage = (page: number) => {
+    goToPage(page, filters);
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    
+    // Always show first 3 pages
+    const firstPages = [1, 2, 3];
+    
+    // If current page is in the first 5 pages, show them all
+    if (currentPage <= 5) {
+      const maxPage = Math.max(currentPage + (hasNextPage ? 2 : 1), 5);
+      for (let i = 1; i <= maxPage; i++) {
+        pages.push(i);
+      }
+      
+      // Add ellipsis if there are more pages ahead
+      if (hasNextPage && currentPage >= 3) {
+        pages.push('...');
+      }
+    } else {
+      // Show first 3 pages
+      pages.push(1, 2, 3);
+      
+      // Add ellipsis after first 3 if current page is far
+      if (currentPage > 5) {
+        pages.push('...');
+      }
+      
+      // Show pages around current page (current - 1, current, current + 1)
+      const start = Math.max(4, currentPage - 1);
+      const end = currentPage + 1;
+      
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) {
+          pages.push(i);
+        }
+      }
+      
+      // Add ellipsis if there are more pages ahead
+      if (hasNextPage) {
+        pages.push('...');
+      }
+    }
+    
+    return pages;
   };
 
   const handleCreateRequest = async (requestData: any) => {
@@ -536,7 +629,14 @@ export default function RequestsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Filters</CardTitle>
+            {Object.keys(filters).length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -601,9 +701,81 @@ export default function RequestsPage() {
       </Card>
 
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Requests ({requests.length})</h2>
-        </div>
+        {/* Header with Pagination Controls */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-xl font-semibold">Requests ({requests.length})</h2>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Items per page:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={!hasPreviousPage || loading}
+                  className="mr-2"
+                >
+                  Previous
+                </Button>
+                
+                {getPageNumbers().map((pageNum, index) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  const isCurrentPage = pageNum === currentPage;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={isCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => !isCurrentPage && handleGoToPage(pageNum as number)}
+                      disabled={loading}
+                      className={isCurrentPage ? "font-bold" : ""}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={!hasNextPage || loading}
+                  className="ml-2"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
         {requests.length === 0 ? (
           <Card>
@@ -620,6 +792,86 @@ export default function RequestsPage() {
             </div>
           </div>
         )}
+        
+        {/* Footer Pagination Controls */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {requests.length} {requests.length === 1 ? 'request' : 'requests'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Items per page:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={!hasPreviousPage || loading}
+                  className="mr-2"
+                >
+                  Previous
+                </Button>
+                
+                {getPageNumbers().map((pageNum, index) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  const isCurrentPage = pageNum === currentPage;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={isCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => !isCurrentPage && handleGoToPage(pageNum as number)}
+                      disabled={loading}
+                      className={isCurrentPage ? "font-bold" : ""}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={!hasNextPage || loading}
+                  className="ml-2"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ export default function SupportPage() {
   console.log('Support page user:', user);
 
   return (
-    <div className="h-full bg-gray-900 rounded-lg">
+    <div className="h-full rounded-lg">
       <CustomerSupportUI 
         currentUserType="admin"
         currentUserId={user?.uid || 'default-admin'}

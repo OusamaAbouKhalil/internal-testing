@@ -179,7 +179,7 @@ export function PhoneCountrySelector({
               <span className="flex items-center gap-2">
                 <span>{item.flag}</span>
                 <span className="font-mono">{item.code}</span>
-                <span className="text-xs text-gray-500">{item.country}</span>
+                <span className="text-xs text-muted-foreground">{item.country}</span>
               </span>
             </SelectItem>
           ))}

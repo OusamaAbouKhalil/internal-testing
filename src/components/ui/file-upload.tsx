@@ -185,10 +185,10 @@ export function FileUpload({
               {getFileIcon(getFileName(value))}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {getFileName(value)}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {value.startsWith('http') ? 'External URL' : 'Uploaded file'}
               </p>
             </div>
@@ -259,7 +259,7 @@ export function FileUpload({
             </Button>
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Or paste file URL:
           </div>
           <Input
@@ -279,7 +279,7 @@ export function FileUpload({
         )}
 
         {/* Info */}
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           Max file size: {maxSizeMB}MB. Supported formats: {acceptedTypes.join(', ')}
         </p>
       </div>

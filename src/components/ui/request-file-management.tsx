@@ -265,7 +265,7 @@ export function RequestFileManagement({
           )}
 
           {/* Info */}
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Max file size: 10MB. Supported formats: {acceptedTypes.join(', ')}
           </p>
         </CardContent>
@@ -309,7 +309,7 @@ export function RequestFileManagement({
                   ) : (
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{file.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{file.link}</div>
+                      <div className="text-xs text-muted-foreground truncate">{file.link}</div>
                     </div>
                   )}
                 </div>
@@ -358,9 +358,9 @@ export function RequestFileManagement({
       {files.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
-            <File className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-500">No files uploaded yet</p>
-            <p className="text-sm text-gray-400">Click "Add File" to upload files for this request</p>
+            <File className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No files uploaded yet</p>
+            <p className="text-sm text-muted-foreground">Click "Add File" to upload files for this request</p>
           </CardContent>
         </Card>
       )}

@@ -237,9 +237,9 @@ export default function TutorsPage() {
       case 'google':
         return <Globe className="h-4 w-4 text-red-500" />;
       case 'apple':
-        return <Apple className="h-4 w-4 text-gray-800" />;
+        return <Apple className="h-4 w-4 text-foreground" />;
       default:
-        return <User className="h-4 w-4 text-gray-600" />;
+        return <User className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -262,9 +262,9 @@ export default function TutorsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-white">Tutors</h1>
-            <p className="text-gray-300 mt-2">Manage tutor accounts and information</p>
-            <p className="text-sm text-gray-400 mt-1">Total: {totalCount} tutors</p>
+            <h1 className="text-3xl font-bold">Tutors</h1>
+            <p className="text-muted-foreground mt-2">Manage tutor accounts and information</p>
+            <p className="text-sm text-muted-foreground mt-1">Total: {totalCount} tutors</p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -293,7 +293,7 @@ export default function TutorsPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         This will import all tutors from the tutors.json file.
                       </p>
                       <div className="flex justify-end space-x-2">
@@ -324,7 +324,7 @@ export default function TutorsPage() {
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search by name, email, phone, WhatsApp, country, bio, etc..."
                 value={searchTerm}
@@ -338,9 +338,9 @@ export default function TutorsPage() {
           </div>
 
           {showFilters && (
-            <Card className="bg-gray-800 border-gray-700">
+            <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-white">Filters</CardTitle>
+                <CardTitle className="text-lg">Filters</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -433,7 +433,7 @@ export default function TutorsPage() {
         <LoadingOverlay loading={loading}>
           <div className="grid gap-4">
             {tutors.map((tutor) => (
-              <Card key={tutor.id} className="transition-all duration-200 hover:shadow-md bg-gray-800 border-gray-700">
+              <Card key={tutor.id} className="transition-all duration-200 hover:shadow-md">
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -459,17 +459,17 @@ export default function TutorsPage() {
                           </div>
                         )}
                         <div className="flex-1">
-                          <CardTitle className="flex items-center gap-2 mb-1 text-white">
+                          <CardTitle className="flex items-center gap-2 mb-1">
                             <GraduationCap className="h-5 w-5" />
                             {tutor.full_name || 'No Name'}
                           </CardTitle>
                           {tutor.nickname && tutor.nickname !== tutor.full_name && (
-                            <p className="text-sm text-gray-300 mb-1 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                               <UserCircle className="h-3 w-3" />
                               @{tutor.nickname}
                             </p>
                           )}
-                          <CardDescription className="flex items-center gap-4 mt-1 text-gray-300">
+                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Mail className="h-4 w-4" />
                               {tutor.email}
@@ -503,7 +503,7 @@ export default function TutorsPage() {
                             className={
                               tutor.verified === '2'
                                 ? "hover:bg-green-50 hover:border-green-200 text-green-600 border-green-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.verified === '2' ? 'Unverify tutor' : 'Verify tutor'}
                           >
@@ -525,7 +525,7 @@ export default function TutorsPage() {
                             className={
                               tutor.send_notifications === '1'
                                 ? "hover:bg-blue-50 hover:border-blue-200 text-blue-600 border-blue-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.send_notifications === '1' ? 'Disable notifications' : 'Enable notifications'}
                           >
@@ -547,7 +547,7 @@ export default function TutorsPage() {
                             className={
                               tutor.cancelled === '1'
                                 ? "hover:bg-red-50 hover:border-red-200 text-red-600 border-red-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.cancelled === '1' ? 'Activate tutor' : 'Cancel tutor'}
                           >
@@ -592,7 +592,7 @@ export default function TutorsPage() {
                   {/* Column 1: Contact Info */}
                   <div className="space-y-3">
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                         <Mail className="h-3 w-3" />
                         Email
                       </h4>
@@ -600,7 +600,7 @@ export default function TutorsPage() {
                     </div>
                     {tutor.phone && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Phone className="h-3 w-3" />
                           Phone
                         </h4>
@@ -609,7 +609,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.whatsapp_phone && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <MessageCircle className="h-3 w-3" />
                           WhatsApp
                         </h4>
@@ -622,7 +622,7 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.country && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <MapPin className="h-3 w-3" />
                           Location
                         </h4>
@@ -632,7 +632,7 @@ export default function TutorsPage() {
                       </div>
                     )}
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                         <MessageSquare className="h-3 w-3" />
                         Requests
                       </h4>
@@ -644,7 +644,7 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.nationality && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <User className="h-3 w-3" />
                           Nationality
                         </h4>
@@ -653,7 +653,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.gender && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <UserCircle className="h-3 w-3" />
                           Gender
                         </h4>
@@ -662,7 +662,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.date_of_birth && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Calendar className="h-3 w-3" />
                           Date of Birth
                         </h4>
@@ -681,7 +681,7 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.experience_years !== null && tutor.experience_years !== undefined && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Award className="h-3 w-3" />
                           Experience
                         </h4>
@@ -690,7 +690,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.major && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <BookOpen className="h-3 w-3" />
                           Major
                         </h4>
@@ -704,7 +704,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.languages && tutor.languages.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Languages className="h-3 w-3" />
                           Languages
                         </h4>
@@ -727,7 +727,7 @@ export default function TutorsPage() {
                 {/* Skills & Subjects Section - Compact */}
                 {(tutor.skills?.length || tutor.subjects?.length) && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <BookOpen className="h-3 w-3" />
                       Skills & Subjects
                     </h4>
@@ -735,7 +735,7 @@ export default function TutorsPage() {
                       {/* Skills */}
                       {tutor.skills && tutor.skills.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-medium text-gray-500 mb-1">Skills</h5>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Skills</h5>
                           <div className="flex flex-wrap gap-1">
                             {tutor.skills.map((skillId) => {
                               const subject = subjects.find(s => s.id === skillId.toString());
@@ -752,7 +752,7 @@ export default function TutorsPage() {
                       {/* Subjects */}
                       {tutor.subjects && tutor.subjects.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-medium text-gray-500 mb-1">Teaching Subjects</h5>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Teaching Subjects</h5>
                           <div className="flex flex-wrap gap-1">
                             {tutor.subjects.map((subjectId) => {
                               const subject = subjects.find(s => s.id === subjectId.toString());
@@ -773,11 +773,11 @@ export default function TutorsPage() {
                 {/* Bio Section - Compact */}
                 {tutor.bio && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <FileText className="h-3 w-3" />
                       Bio
                     </h4>
-                    <div className="text-sm text-gray-700 whitespace-pre-wrap bio-text max-w-full max-h-20 overflow-hidden">
+                    <div className="text-sm text-foreground whitespace-pre-wrap bio-text max-w-full max-h-20 overflow-hidden">
                       {tutor.bio.length > 150 ? `${tutor.bio}` : tutor.bio}
                     </div>
                   </div>
@@ -786,14 +786,14 @@ export default function TutorsPage() {
                 {/* Education/Degrees Section */}
                 {tutor.degree && tutor.degree.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-3">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-3">
                       <GraduationCap className="h-3 w-3" />
                       Education & Certifications
                     </h4>
                     <div className="space-y-3">
                       {Array.isArray(tutor.degree) && tutor.degree.length > 0 ? (
                         tutor.degree.map((degree, index) => (
-                          <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <div key={index} className="bg-muted p-3 rounded-lg border">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
@@ -802,7 +802,7 @@ export default function TutorsPage() {
                                   </Badge>
                                 </div>
                                 {Array.isArray(tutor.university) && tutor.university[index] && (
-                                  <p className="text-sm font-medium text-gray-700 mt-1">
+                                  <p className="text-sm font-medium text-foreground mt-1">
                                     {tutor.university[index]}
                                   </p>
                                 )}
@@ -830,13 +830,13 @@ export default function TutorsPage() {
 
                 {Array.isArray(tutor.id_file_link) && tutor.id_file_link.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-3">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-3">
                       <FileText className="h-3 w-3" />
                       ID Documents
                     </h4>
                     <div className="space-y-3">
                       {tutor.id_file_link.map((link, idx) => (
-                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div key={idx} className="bg-muted p-3 rounded-lg border">
                           <div className="flex items-center gap-2">
                             <a
                               href={getImageUrl(link)}
@@ -856,11 +856,11 @@ export default function TutorsPage() {
                 
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
                       <span>Joined {typeof tutor.created_at === 'string' ? new Date(tutor.created_at).toLocaleDateString() : new Date((tutor.created_at as any)._seconds * 1000).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       {getSignInMethodIcon(tutor.sign_in_method)}
                       <span>{getSignInMethodLabel(tutor.sign_in_method)}</span>
                     </div>
@@ -885,9 +885,9 @@ export default function TutorsPage() {
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="text-center">
-                <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No tutors found</h3>
-                <p className="text-gray-400 mb-4">
+                <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No tutors found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm || Object.keys(filters).length > 0 
                     ? 'No tutors match your search criteria.' 
                     : 'Tutors will appear here once they are added to the system.'

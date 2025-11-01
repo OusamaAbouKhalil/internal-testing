@@ -55,7 +55,7 @@ export async function PUT(
 
     // Get updated message
     const updatedMessageDoc = await adminDb.collection('customer_support_chats').doc(messageId).get();
-    const updatedMessage = { id: updatedMessageDoc.id, ...updatedMessageDoc.data() };
+    const updatedMessage: any = { id: updatedMessageDoc.id, ...updatedMessageDoc.data() };
 
     // Handle Firebase notifications
     if (user_type !== 'admin') {
@@ -65,13 +65,13 @@ export async function PUT(
         body: message,
         room_id,
         message_id: messageId,
-        sender_id: updatedMessage.sender_id,
+        sender_id: updatedMessage?.sender_id,
         user_type,
         type: 'edit_message_support'
       });
     } else {
       // Send notification to student/tutor
-      let targetUser = null;
+      let targetUser: any = null;
       
       if (roomData?.user_type === 'student' && roomData?.user_id) {
         const studentDoc = await adminDb.collection('students').doc(roomData.user_id).get();

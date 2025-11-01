@@ -1,0 +1,641 @@
+requests (collection)
+ └── {request_id} (document)
+      ├── accepted: string ("0" or "1")   ← should be bool ideally
+      ├── answer_files: null | Array ← files uploaded by the tutor
+      ├── answer_text: null | string
+      ├── assistance_type: string  ← ENUM
+      ├── cancel_reason: null | string
+      ├── cancelled: string ("0"/"1")     ← should be bool
+      ├── cms_attributes: string ("0" or other JSON?) 
+      ├── comments: null | string
+      ├── completed: string ("0"/"1")
+      ├── country: string
+      ├── created_at: timestamp
+      ├── date: timestamp
+      ├── deadline: timestamp
+      ├── deleted_at: null | timestamp
+      ├── description: null | string
+      ├── description_type: null | string
+      ├── discount: string (numeric, e.g. "100")
+      ├── duration: null | int
+      ├── exam_type: string
+      ├── feedback: null | string
+      ├── field: null | string
+      ├── field_id: null | string (numeric stored as text)
+      ├── file_links: string (JSON-encoded array of paths)
+      ├── file_names: string (JSON-encoded array of names)
+      ├── grade: null | string
+      ├── is_paid: string ("0"/"1")
+      ├── issue_reported: string ("0"/"1")
+      ├── label: string
+      ├── language: string
+      ├── locked: string ("0"/"1")
+      ├── meeting_id: null | string
+      ├── meeting_password: null | string
+      ├── meeting_record_url: null | string
+      ├── min_price: null | string (numeric)
+      ├── notes: string
+      ├── omt_info: null | string/object
+      ├── paid: string ("0"/"1")
+      ├── promo_id: string (numeric stored as text)
+      ├── rating: null | string (numeric stored as text)
+      ├── receipt_submitted: string ("0"/"1")
+      ├── request_status: string
+      ├── saved_by: null | string
+      ├── state: null | string
+      ├── student_id: string (numeric stored as text)
+      ├── student_meeting_url: null | string
+      ├── student_nickname: null | string
+      ├── student_price: string (numeric stored as text)
+      ├── sub_subject: null | string
+      ├── subject: string
+      ├── subject_id: string (numeric stored as text)
+      ├── syllabus_link: null | string
+      ├── time: string
+      ├── timezone: string
+      ├── tutor_accepted: string ("0"/"1")
+      ├── tutor_id: string (text)
+      ├── tutor_meeting_url: null | string
+      ├── tutor_nickname: null | string
+      ├── tutor_price: string (numeric stored as text)
+      ├── updated_at: timestamp
+      ├── version: string (numeric stored as text)
+      ├── zoom_information: null | string/object
+      ├── zoom_user_id: null | string
+      │
+      └── tutor_offers (subcollection)
+           └── {tutor_id} (document)
+                ├── cancel_reason: null | string
+                ├── created_at: timestamp
+                ├── price: string (numeric stored as text)
+                ├── request_id: string
+                ├── status: string
+                ├── tutor_id: string
+                └── updated_at: timestamp
+
+
+import 'package:flutter/material.dart';
+import 'package:hugeicons/hugeicons.dart';
+
+enum RequestType { EXAM, HOMEWORK, PROJECT, THESIS, ONLINE, SOS }
+
+enum RequestStatus {
+  NEW,
+  PENDING,
+  PENDING_PAYMENT,
+  ONGOING,
+  TUTOR_COMPLETED,
+  COMPLETED,
+  CANCELLED,
+}
+
+extension RequestStatusExtension on RequestStatus {
+  String get value {
+    switch (this) {
+      case RequestStatus.NEW:
+        return 'NEW';
+      case RequestStatus.PENDING:
+        return 'PENDING';
+      case RequestStatus.PENDING_PAYMENT:
+        return 'PENDING_PAYMENT';
+      case RequestStatus.ONGOING:
+        return 'ONGOING';
+      case RequestStatus.TUTOR_COMPLETED:
+        return 'TUTOR_COMPLETED';
+      case RequestStatus.COMPLETED:
+        return 'COMPLETED';
+      case RequestStatus.CANCELLED:
+        return 'CANCELLED';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case RequestStatus.NEW:
+        return 'Waiting for Bids';
+      case RequestStatus.PENDING:
+        return 'Waiting for Bids';
+      case RequestStatus.PENDING_PAYMENT:
+        return 'Pending Payment';
+      case RequestStatus.ONGOING:
+        return 'Ongoing';
+      case RequestStatus.TUTOR_COMPLETED:
+        return 'Tutor Completed';
+      case RequestStatus.COMPLETED:
+        return 'Completed';
+      case RequestStatus.CANCELLED:
+        return 'Cancelled';
+    }
+  }
+
+  String get title {
+    switch (this) {
+      case RequestStatus.NEW:
+        return 'New';
+      case RequestStatus.PENDING:
+        return 'Pending';
+      case RequestStatus.PENDING_PAYMENT:
+        return 'Pending Payment';
+      case RequestStatus.ONGOING:
+        return 'Ongoing';
+      case RequestStatus.TUTOR_COMPLETED:
+        return 'Tutor Completed';
+      case RequestStatus.COMPLETED:
+        return 'Completed';
+      case RequestStatus.CANCELLED:
+        return 'Canceled';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case RequestStatus.NEW:
+        return const Color(0xFF666666);
+      case RequestStatus.PENDING:
+        return const Color(0xFFF97316);
+      case RequestStatus.PENDING_PAYMENT:
+        return const Color(0xFF06B6D4);
+      case RequestStatus.ONGOING:
+        return const Color(0xFFD040C9);
+      case RequestStatus.TUTOR_COMPLETED:
+        return const Color(0xFF06B6D4);
+      case RequestStatus.COMPLETED:
+        return const Color(0xFF29C76F);
+      case RequestStatus.CANCELLED:
+        return const Color(0xFFEA5455);
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case RequestStatus.NEW:
+        return HugeIcons.strokeRoundedClock01;
+      case RequestStatus.PENDING:
+        return HugeIcons.strokeRoundedClock01;
+      case RequestStatus.PENDING_PAYMENT:
+        return HugeIcons.strokeRoundedDollarCircle;
+      case RequestStatus.ONGOING:
+        return HugeIcons.strokeRoundedHourglass;
+      case RequestStatus.TUTOR_COMPLETED:
+        return HugeIcons.strokeRoundedClock01;
+      case RequestStatus.COMPLETED:
+        return HugeIcons.strokeRoundedCheckmarkCircle02;
+      case RequestStatus.CANCELLED:
+        return HugeIcons.strokeRoundedCancelCircle;
+    }
+  }
+}
+
+extension RequestTypeExtension on RequestType {
+  String get label {
+    switch (this) {
+      case RequestType.EXAM:
+        return 'Premium Exam Assistance';
+      case RequestType.HOMEWORK:
+        return 'Homework';
+      case RequestType.PROJECT:
+        return 'Project';
+      case RequestType.THESIS:
+        return 'Thesis';
+      case RequestType.ONLINE:
+        return 'Online';
+      case RequestType.SOS:
+        return 'Q&A';
+    }
+  }
+}
+
+extension RequestTypeExtensionValue on RequestType {
+  String get value {
+    switch (this) {
+      case RequestType.EXAM:
+        return 'EXAM';
+      case RequestType.HOMEWORK:
+        return 'HOMEWORK';
+      case RequestType.PROJECT:
+        return 'PROJECT';
+      case RequestType.THESIS:
+        return 'THESIS';
+      case RequestType.ONLINE:
+        return 'ONLINE';
+      case RequestType.SOS:
+        return 'SOS';
+    }
+  }
+}
+
+extension RequestTypeExtensionName on RequestType {
+  String get name {
+    switch (this) {
+      case RequestType.EXAM:
+        return 'Premium Exam Assistance';
+      case RequestType.HOMEWORK:
+        return 'Homework Help';
+      case RequestType.PROJECT:
+        return 'Expert project assistance';
+      case RequestType.THESIS:
+        return 'Master’s Thesis Assistance';
+      case RequestType.ONLINE:
+        return 'One-on-one Tutoring Session';
+      case RequestType.SOS:
+        return 'Rapid Q&A assistance';
+    }
+  }
+}
+
+extension RequestTypeExtensionIcon on RequestType {
+  IconData get icon {
+    switch (this) {
+      case RequestType.EXAM:
+        return HugeIcons.strokeRoundedTaskDaily02;
+      case RequestType.HOMEWORK:
+        return HugeIcons.strokeRoundedNotebook02;
+      case RequestType.PROJECT:
+        return HugeIcons.strokeRoundedIdea01;
+      case RequestType.THESIS:
+        return HugeIcons.strokeRoundedFile01;
+      case RequestType.ONLINE:
+        return HugeIcons.strokeRoundedOnlineLearning01;
+      case RequestType.SOS:
+        return HugeIcons.strokeRoundedHelpSquare;
+    }
+  }
+}
+
+extension RequestTypeExtensionColor on RequestType {
+  Color get color {
+    switch (this) {
+      case RequestType.EXAM:
+        return const Color(0xFF06B6D4);
+      case RequestType.HOMEWORK:
+        return const Color(0xFFF97316);
+      case RequestType.PROJECT:
+        return const Color(0xFF2ECA9E);
+      case RequestType.THESIS:
+        return const Color(0xFFEC4899);
+      case RequestType.ONLINE:
+        return const Color(0xFFD040C9);
+      case RequestType.SOS:
+        return const Color(0xFF081157);
+    }
+  }
+}
+
+enum RequestExamType { MCQ, SHORTANSWER, PROBLEMSOLVING, ESSAY, MIX, OTHER }
+
+extension RequestExamTypeExtension on RequestExamType {
+  String get label {
+    switch (this) {
+      case RequestExamType.MCQ:
+        return 'MCQ';
+      case RequestExamType.SHORTANSWER:
+        return 'Short Answer';
+      case RequestExamType.PROBLEMSOLVING:
+        return 'Problem Solving';
+      case RequestExamType.ESSAY:
+        return 'Essay / Subjective';
+      case RequestExamType.MIX:
+        return 'Mix';
+      case RequestExamType.OTHER:
+        return 'Other';
+    }
+  }
+}
+
+extension RequestExamTypeExtensionValue on RequestExamType {
+  String get value {
+    switch (this) {
+      case RequestExamType.MCQ:
+        return 'MCQ';
+      case RequestExamType.SHORTANSWER:
+        return 'SHORTANSWER';
+      case RequestExamType.PROBLEMSOLVING:
+        return 'PROBLEMSOLVING';
+      case RequestExamType.ESSAY:
+        return 'ESSAY';
+      case RequestExamType.MIX:
+        return 'MIX';
+      case RequestExamType.OTHER:
+        return 'OTHER';
+    }
+  }
+}
+
+enum RequestHomeworkType {
+  PRACTICEPROBLEMS,
+  ESSAYWRITING,
+  RESEARCHBASED,
+  PRESENTATION,
+  OTHER,
+}
+
+extension RequestHomeworkTypeExtension on RequestHomeworkType {
+  String get label {
+    switch (this) {
+      case RequestHomeworkType.PRACTICEPROBLEMS:
+        return 'Practice Problems';
+      case RequestHomeworkType.ESSAYWRITING:
+        return 'Essay Writing';
+      case RequestHomeworkType.RESEARCHBASED:
+        return 'Research-Based';
+      case RequestHomeworkType.PRESENTATION:
+        return 'Presentation';
+      case RequestHomeworkType.OTHER:
+        return 'Other';
+    }
+  }
+}
+
+extension RequestHomeworkTypeExtensionValue on RequestHomeworkType {
+  String get value {
+    switch (this) {
+      case RequestHomeworkType.PRACTICEPROBLEMS:
+        return 'PRACTICEPROBLEMS';
+      case RequestHomeworkType.ESSAYWRITING:
+        return 'ESSAYWRITING';
+      case RequestHomeworkType.RESEARCHBASED:
+        return 'RESEARCHBASED';
+      case RequestHomeworkType.PRESENTATION:
+        return 'PRESENTATION';
+      case RequestHomeworkType.OTHER:
+        return 'OTHER';
+    }
+  }
+}
+
+enum RequestProjectType {
+  RESEARCH,
+  DESIGN,
+  CASESTUDY,
+  PRESENTATION,
+  EXPERIMENT,
+  PROBLEMSOLVING,
+  OTHER,
+}
+
+extension RequestProjectTypeExtension on RequestProjectType {
+  String get label {
+    switch (this) {
+      case RequestProjectType.RESEARCH:
+        return 'Research';
+      case RequestProjectType.DESIGN:
+        return 'Design';
+      case RequestProjectType.CASESTUDY:
+        return 'Case Study';
+      case RequestProjectType.PRESENTATION:
+        return 'Presentation';
+      case RequestProjectType.EXPERIMENT:
+        return 'Experiment';
+      case RequestProjectType.PROBLEMSOLVING:
+        return 'Problem Solving';
+      case RequestProjectType.OTHER:
+        return 'Other';
+    }
+  }
+}
+
+extension RequestProjectTypeExtensionValue on RequestProjectType {
+  String get value {
+    switch (this) {
+      case RequestProjectType.RESEARCH:
+        return 'RESEARCH';
+      case RequestProjectType.DESIGN:
+        return 'DESIGN';
+      case RequestProjectType.CASESTUDY:
+        return 'CASESTUDY';
+      case RequestProjectType.PRESENTATION:
+        return 'PRESENTATION';
+      case RequestProjectType.EXPERIMENT:
+        return 'EXPERIMENT';
+      case RequestProjectType.PROBLEMSOLVING:
+        return 'PROBLEMSOLVING';
+      case RequestProjectType.OTHER:
+        return 'OTHER';
+    }
+  }
+}
+
+enum RequestThesisType {
+  LITERATUREREVIEW,
+  RESEARCH,
+  DATAANALYSIS,
+  WRITINGSUPPORT,
+  PROOFREADING,
+  PARTIALREVIEW,
+  FULLREVIEW,
+  PLAGIARISMCHECK,
+  PRESENTATION,
+  OTHER,
+}
+
+extension RequestThesisTypeExtension on RequestThesisType {
+  String get label {
+    switch (this) {
+      case RequestThesisType.LITERATUREREVIEW:
+        return 'Literature review';
+      case RequestThesisType.RESEARCH:
+        return 'Research';
+      case RequestThesisType.DATAANALYSIS:
+        return 'Data analysis';
+      case RequestThesisType.WRITINGSUPPORT:
+        return 'Writing support';
+      case RequestThesisType.PROOFREADING:
+        return 'Proofreading';
+      case RequestThesisType.PARTIALREVIEW:
+        return 'Partial review';
+      case RequestThesisType.FULLREVIEW:
+        return 'Full review';
+      case RequestThesisType.PLAGIARISMCHECK:
+        return 'Plagiarism check';
+      case RequestThesisType.PRESENTATION:
+        return 'Presentation';
+      case RequestThesisType.OTHER:
+        return 'Other';
+    }
+  }
+}
+
+extension RequestThesisTypeExtensionValue on RequestThesisType {
+  String get value {
+    switch (this) {
+      case RequestThesisType.LITERATUREREVIEW:
+        return 'LITERATUREREVIEW';
+      case RequestThesisType.RESEARCH:
+        return 'RESEARCH';
+      case RequestThesisType.DATAANALYSIS:
+        return 'DATAANALYSIS';
+      case RequestThesisType.WRITINGSUPPORT:
+        return 'WRITINGSUPPORT';
+      case RequestThesisType.PROOFREADING:
+        return 'PROOFREADING';
+      case RequestThesisType.PARTIALREVIEW:
+        return 'PARTIALREVIEW';
+      case RequestThesisType.FULLREVIEW:
+        return 'FULLREVIEW';
+      case RequestThesisType.PLAGIARISMCHECK:
+        return 'PLAGIARISMCHECK';
+      case RequestThesisType.PRESENTATION:
+        return 'PRESENTATION';
+      case RequestThesisType.OTHER:
+        return 'OTHER';
+    }
+  }
+}
+
+enum RequestSorting {
+  NEWESTTOOLDEST,
+  OLDESTTONEWEST,
+  SOONESTDUEDATETOOLDEST,
+  LATESTDUEDATETOSOONEST,
+}
+
+extension RequestSortingExtension on RequestSorting {
+  String get label {
+    switch (this) {
+      case RequestSorting.NEWESTTOOLDEST:
+        return 'Newest request to oldest request (default)';
+      case RequestSorting.OLDESTTONEWEST:
+        return 'Oldest request to newest request';
+      case RequestSorting.SOONESTDUEDATETOOLDEST:
+        return 'Soonest due date to oldest due date';
+      case RequestSorting.LATESTDUEDATETOSOONEST:
+        return 'Latest due date to soonest due date';
+    }
+  }
+}
+
+enum RequestTimeRange { MORNING, AROUNDNOON, AFTERNOON, NIGHT }
+
+extension RequestTimeRangeExtension on RequestTimeRange {
+  String get label {
+    switch (this) {
+      case RequestTimeRange.MORNING:
+        return 'Morning (before 11:00 AM)';
+      case RequestTimeRange.AROUNDNOON:
+        return 'Around Noon (11:00 AM - 2:00 PM)';
+      case RequestTimeRange.AFTERNOON:
+        return 'Afternoon (2:00 PM - 7:00 PM)';
+      case RequestTimeRange.NIGHT:
+        return 'Night (after 7:00 PM)';
+    }
+  }
+}
+
+enum BidStatus {
+  INVITED,
+  INVITEREJECTED,
+  PENDING,
+  ACCEPTED,
+  REJECTED,
+  CANCELLED,
+}
+
+extension BidStatusExtension on BidStatus {
+  String get value {
+    switch (this) {
+      case BidStatus.INVITED:
+        return 'INVITED';
+      case BidStatus.INVITEREJECTED:
+        return 'INVITEREJECTED';
+      case BidStatus.PENDING:
+        return 'PENDING';
+      case BidStatus.ACCEPTED:
+        return 'ACCEPTED';
+      case BidStatus.REJECTED:
+        return 'REJECTED';
+      case BidStatus.CANCELLED:
+        return 'CANCELLED';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case BidStatus.INVITED:
+        return 'Invited';
+      case BidStatus.INVITEREJECTED:
+        return 'Rejected';
+      case BidStatus.PENDING:
+        return 'Pending';
+      case BidStatus.ACCEPTED:
+        return 'Accepted';
+      case BidStatus.REJECTED:
+        return 'Rejected';
+      case BidStatus.CANCELLED:
+        return 'Cancelled';
+    }
+  }
+
+  String get name {
+    switch (this) {
+      case BidStatus.INVITED:
+        return 'Pending answer';
+      case BidStatus.INVITEREJECTED:
+        return 'Rejected';
+      case BidStatus.PENDING:
+        return 'Accept Pending';
+      case BidStatus.ACCEPTED:
+        return 'Accepted';
+      case BidStatus.REJECTED:
+        return 'Bid rejected';
+      case BidStatus.CANCELLED:
+        return 'Withdrew';
+    }
+  }
+
+  Color get color {
+    switch (this) {
+      case BidStatus.INVITED:
+        return const Color(0xFFF97316);
+      case BidStatus.INVITEREJECTED:
+        return const Color(0xFFEA5455);
+      case BidStatus.PENDING:
+        return const Color(0xFFF97316);
+      case BidStatus.ACCEPTED:
+        return const Color(0xFF29C76F);
+      case BidStatus.REJECTED:
+        return const Color(0xFFEA5455);
+      case BidStatus.CANCELLED:
+        return const Color(0xFFEA5455);
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case BidStatus.INVITED:
+        return HugeIcons.strokeRoundedClock01;
+      case BidStatus.INVITEREJECTED:
+        return HugeIcons.strokeRoundedCancelCircle;
+      case BidStatus.PENDING:
+        return HugeIcons.strokeRoundedClock01;
+      case BidStatus.ACCEPTED:
+        return HugeIcons.strokeRoundedCheckmarkCircle02;
+      case BidStatus.REJECTED:
+        return HugeIcons.strokeRoundedCancelCircle;
+      case BidStatus.CANCELLED:
+        return HugeIcons.strokeRoundedCancelCircle;
+    }
+  }
+}
+
+assistance_type is Project or exam or homework etc and saved in database as small letters
+
+for assistance_type Project just preview due date, time, instructions, materials(they are files), language, 
+subject, title( from label ), sub subject, type
+
+for assistance_type Exam title, subject, date, time, duration, instructions, sub subject, language materials type
+
+for assistance_type home work due date, time, instructions materials, language, title, subject, type subject
+
+for assistance_type thesis due date, time, instructions, materials, language, title, subject sub subject type
+
+for q & a due date, time, question, course, language, subject, title, sub subject, type
+
+one o one date, time, duration, instructions, materials, language, subject, sub subject
+
+online class date, time, duration, materials, language, subject, title, sub subject, covered topics private or public, number of participents
+
+
+follow this related fields please
+
+for assistance_type Project just preview due date(date "2025-10-16T00:00:00.000",), time duration"30 minutes", instructions("TEXT"), materials(they are files), language(Text), 
+subject, title( from label ), sub subject, type(assistant_type) subject "ID", Language("TEXT") materials file_links ARRAY countryn "LEBANON"

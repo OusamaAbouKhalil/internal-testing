@@ -522,7 +522,7 @@ export function ChatDialog({
       case 'admin':
         return { name: 'Admin', icon: <MessageCircle className="h-4 w-4" />, color: 'bg-purple-100 text-purple-800' };
       default:
-        return { name: 'Unknown', icon: <User className="h-4 w-4" />, color: 'bg-gray-100 text-gray-800' };
+        return { name: 'Unknown', icon: <User className="h-4 w-4" />, color: 'bg-muted text-foreground' };
     }
   };
 

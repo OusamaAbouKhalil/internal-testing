@@ -310,7 +310,7 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                   <div className="space-y-4">
                     {/* Status Badges */}
                     <div>
-                      <Label className="text-sm text-gray-500 mb-2 block">Current Status</Label>
+                      <Label className="text-sm text-muted-foreground mb-2 block">Current Status</Label>
                       <div className="flex flex-wrap gap-2">
                         {statusBadges}
                       </div>
@@ -378,7 +378,7 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                       className={emailError ? 'border-red-500' : ''}
                     />
                     {isValidatingEmail && (
-                      <p className="text-sm text-gray-500 mt-1">Checking email...</p>
+                      <p className="text-sm text-muted-foreground mt-1">Checking email...</p>
                     )}
                     {emailError && (
                       <p className="text-sm text-red-500 mt-1">{emailError}</p>
@@ -389,7 +389,7 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                     <Label htmlFor="password" className="flex items-center gap-1">
                       <Lock className="h-3 w-3" />
                       Password {mode === 'create' && '*'}
-                      {mode === 'edit' && <span className="text-xs text-gray-500 ml-1">(leave empty to keep current)</span>}
+                      {mode === 'edit' && <span className="text-xs text-muted-foreground ml-1">(leave empty to keep current)</span>}
                     </Label>
                     <div className="relative">
                       <Input
@@ -500,7 +500,7 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                       />
                     </div>
                     {isValidatingPhone && (
-                      <p className="text-sm text-gray-500 mt-1">Checking phone number...</p>
+                      <p className="text-sm text-muted-foreground mt-1">Checking phone number...</p>
                     )}
                     {phoneError && (
                       <p className="text-sm text-red-500 mt-1">{phoneError}</p>

@@ -64,8 +64,8 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-2">Track your website performance and user behavior</p>
+          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
+          <p className="text-muted-foreground mt-2">Track your website performance and user behavior</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" className="flex items-center gap-2">
@@ -86,13 +86,13 @@ export default function AnalyticsPage() {
           return (
             <Card key={stat.title} className="hover:shadow-lg transition-shadow duration-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
                   {stat.title}
                 </CardTitle>
-                <Icon className="h-4 w-4 text-gray-500" />
+                <Icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-2xl font-bold text-foreground">{stat.value}</div>
                 <div className="flex items-center text-sm mt-1">
                   {stat.changeType === "increase" ? (
                     <TrendingUp className="h-4 w-4 text-green-500" />
@@ -109,7 +109,7 @@ export default function AnalyticsPage() {
                   >
                     {stat.change}
                   </span>
-                  <span className="text-gray-500 ml-1">{stat.timeframe}</span>
+                  <span className="text-muted-foreground ml-1">{stat.timeframe}</span>
                 </div>
               </CardContent>
             </Card>
@@ -129,8 +129,8 @@ export default function AnalyticsPage() {
             <div className="h-80 bg-gradient-to-r from-blue-50 to-indigo-100 rounded-lg flex items-center justify-center">
               <div className="text-center">
                 <TrendingUp className="h-12 w-12 text-blue-500 mx-auto mb-2" />
-                <p className="text-gray-600 font-medium">Line Chart</p>
-                <p className="text-sm text-gray-500">Traffic trends over time</p>
+                <p className="text-muted-foreground font-medium">Line Chart</p>
+                <p className="text-sm text-muted-foreground">Traffic trends over time</p>
               </div>
             </div>
           </CardContent>
@@ -150,11 +150,11 @@ export default function AnalyticsPage() {
                     <div className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded text-sm font-medium">
                       {index + 1}
                     </div>
-                    <span className="font-mono text-sm text-gray-900">{page.page}</span>
+                    <span className="font-mono text-sm text-foreground">{page.page}</span>
                   </div>
                   <div className="flex items-center space-x-4 text-sm">
-                    <span className="text-gray-600">{page.views} views</span>
-                    <span className="font-medium text-gray-900">{page.percentage}</span>
+                    <span className="text-muted-foreground">{page.views} views</span>
+                    <span className="font-medium text-foreground">{page.percentage}</span>
                   </div>
                 </div>
               ))}
@@ -175,7 +175,7 @@ export default function AnalyticsPage() {
             <div className="h-48 bg-gradient-to-r from-green-50 to-emerald-100 rounded-lg flex items-center justify-center">
               <div className="text-center">
                 <Globe className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">Pie Chart</p>
+                <p className="text-muted-foreground text-sm">Pie Chart</p>
               </div>
             </div>
           </CardContent>
@@ -191,7 +191,7 @@ export default function AnalyticsPage() {
             <div className="h-48 bg-gradient-to-r from-purple-50 to-violet-100 rounded-lg flex items-center justify-center">
               <div className="text-center">
                 <Globe className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">Bar Chart</p>
+                <p className="text-muted-foreground text-sm">Bar Chart</p>
               </div>
             </div>
           </CardContent>
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
             <div className="h-48 bg-gradient-to-r from-orange-50 to-amber-100 rounded-lg flex items-center justify-center">
               <div className="text-center">
                 <Globe className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">World Map</p>
+                <p className="text-muted-foreground text-sm">World Map</p>
               </div>
             </div>
           </CardContent>

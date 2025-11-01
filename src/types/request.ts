@@ -194,7 +194,7 @@ export const getRequestStatusColor = (status: string): string => {
   switch (status) {
     case 'NEW':
     case 'PENDING':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
     case 'PENDING_PAYMENT':
       return 'bg-blue-100 text-blue-800';
     case 'ONGOING':
@@ -206,7 +206,7 @@ export const getRequestStatusColor = (status: string): string => {
     case 'CANCELLED':
       return 'bg-red-100 text-red-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
   }
 };
 
@@ -272,6 +272,25 @@ export interface RequestFilters {
   date_to?: string;
   student_id?: string;
   tutor_id?: string;
+}
+
+// Pagination Types
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  lastVisible?: any; // Firestore document snapshot
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalItems?: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    lastVisible?: any;
+  };
 }
 
 // Field configurations for different assistance types

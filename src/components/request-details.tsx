@@ -12,6 +12,7 @@ import { getRequestTypeLabel } from '@/types/request';
 import { useRequestManagementStore } from '@/stores/request-management-store';
 import { combineDateAndTime, formatDateWithTimezone } from '@/lib/date-utils';
 import { format } from 'date-fns';
+import { Star } from 'lucide-react';
 
 interface RequestDetailsProps {
   request: Request;
@@ -293,6 +294,57 @@ export function RequestDetails({ request }: RequestDetailsProps) {
         <Label>Description</Label>
         <div className="p-2 bg-muted rounded min-h-[100px]">
           {request.description || 'No description'}
+        </div>
+      </div>
+
+      {/* Rating & Feedback */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Rating</Label>
+          {(() => {
+            const ratingNumber = (() => {
+              if (!request.rating || request.rating === '') return 0;
+              const n = Math.round(parseFloat(request.rating));
+              if (isNaN(n)) return 0;
+              return Math.min(5, Math.max(0, n));
+            })();
+
+            const bgClass = ratingNumber >= 4
+              ? 'bg-green-50 border-green-200'
+              : ratingNumber >= 3
+              ? 'bg-amber-50 border-amber-200'
+              : ratingNumber >= 1
+              ? 'bg-red-50 border-red-200'
+              : 'bg-muted';
+
+            return (
+              <div className={`p-2 rounded border ${bgClass}`}>
+                {ratingNumber === 0 ? (
+                  <span className="text-muted-foreground">No rating</span>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const filled = idx < ratingNumber;
+                      return (
+                        <Star
+                          key={idx}
+                          className={filled ? 'h-4 w-4 text-yellow-500' : 'h-4 w-4 text-muted-foreground'}
+                          fill={filled ? 'currentColor' : 'none'}
+                          strokeWidth={1.5}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        <div className="space-y-2">
+          <Label>Feedback</Label>
+          <div className="p-2 bg-muted rounded min-h-[60px]">
+            {request.feedback && request.feedback.trim() !== '' ? request.feedback : 'No feedback'}
+          </div>
         </div>
       </div>
 

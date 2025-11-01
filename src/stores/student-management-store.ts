@@ -226,7 +226,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student created successfully:', result.studentId);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error creating student:', error);
       set({ 
@@ -264,7 +263,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student updated successfully:', studentId);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error updating student:', error);
       set({ 
@@ -287,7 +285,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       });
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error deleting student:', error);
       set({ 
@@ -312,7 +309,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student verification toggled successfully:', studentId, 'to:', verified ? 'verified' : 'unverified');
       
       set({ loading: false });
-      get().fetchStudents();
     } catch (error: any) {
       console.error('Error toggling student verification:', error);
       set({ 
@@ -355,7 +351,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       await Promise.all(batch);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error importing students:', error);
       set({ 

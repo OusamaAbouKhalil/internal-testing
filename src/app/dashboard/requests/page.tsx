@@ -46,6 +46,69 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+function StudentInfoButton({ studentId }: { studentId?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [student, setStudent] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && studentId && !student && !loading) {
+      setLoading(true);
+      fetch(`/api/students/${studentId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.success) setStudent(data.student);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen, studentId, student, loading]);
+
+  if (!studentId) return null;
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className="h-8 px-2"
+        title="View student details"
+      >
+        <UserPlus className="h-4 w-4 mr-1" />
+        Student
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Student Details</DialogTitle>
+          </DialogHeader>
+          {loading ? (
+            <div className="py-6"><LoadingSpinner /></div>
+          ) : student ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Full name:</span><span className="font-medium">{student.full_name || 'N/A'}</span></div>
+              {student.nickname && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Nickname:</span><span className="font-medium">@{student.nickname}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Email:</span><span className="font-medium break-all">{student.email || 'N/A'}</span></div>
+              {(student.country_code || student.phone_number) && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Phone:</span><span className="font-medium">{(student.country_code || '')}{(student.phone_number || '')}</span></div>
+              )}
+              {(student.country || student.city) && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Location:</span><span className="font-medium">{student.city ? `${student.city}, ${student.country || ''}` : (student.country || 'N/A')}</span></div>
+              )}
+            </div>
+          ) : (
+            <div className="py-4 text-sm text-muted-foreground">No student found.</div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ChatButton({ request }: { request: Request }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [studentInfo, setStudentInfo] = useState<{ email: string; nickname: string } | null>(null);
@@ -134,61 +197,120 @@ function ChatButton({ request }: { request: Request }) {
 }
 
 function RequestCard({ request }: { request: Request }) {
-  const formatDate = (value: any) => {
-    if (!value) return 'Not set';
-    
-    try {
-      let date: Date;
-      if (value.toDate && typeof value.toDate === 'function') {
-        date = value.toDate();
-      } else if (typeof value === 'string' || typeof value === 'number') {
-        date = new Date(value);
-      } else {
-        return 'Invalid date';
-      }
-      
-      if (isNaN(date.getTime())) {
-        return 'Invalid date';
-      }
-      
-      return format(date, 'MMM dd, yyyy');
-    } catch (error) {
-      return 'Invalid date';
-    }
-  };
+	const formatDate = (value: any) => {
+    console.log("date is: " + value)
+		if (value === undefined || value === null) return 'Not set';
+		try {
+			let date: Date | null = null;
+
+			// Firestore Timestamp instance with toDate()
+			if (value && typeof value.toDate === 'function') {
+				date = value.toDate();
+			}
+			// Firestore-like object with seconds/_seconds and optional nanoseconds
+			else if (value && typeof value === 'object' && (
+					('seconds' in value) || ('_seconds' in value)
+				)) {
+				const seconds = (value.seconds ?? value._seconds) as number;
+				const nanos = (value.nanoseconds ?? value._nanoseconds ?? 0) as number;
+				if (typeof seconds === 'number') {
+					date = new Date(seconds * 1000 + Math.floor(nanos / 1e6));
+				}
+			}
+			// Native Date
+			else if (value instanceof Date) {
+				date = value;
+			}
+			// Numeric epoch (ms or seconds)
+			else if (typeof value === 'number') {
+				// Heuristic: < 1e12 => seconds, else milliseconds
+				const ms = value < 1e12 ? value * 1000 : value;
+				date = new Date(ms);
+			}
+			// String input (ISO, RFC, or numeric string)
+			else if (typeof value === 'string') {
+				const trimmed = value.trim();
+				if (trimmed === '') return 'Not set';
+				// If purely numeric (or numeric with decimal), treat as epoch
+				if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmed)) {
+					const num = parseFloat(trimmed);
+					const ms = num < 1e12 ? num * 1000 : num;
+					date = new Date(ms);
+				} else {
+					date = new Date(trimmed);
+				}
+			}
+
+			if (!date || isNaN(date.getTime())) return 'Invalid date';
+			return format(date, 'MMM dd, yyyy');
+		} catch {
+			return 'Invalid date';
+		}
+	};
 
   const formatDeadline = (request: Request) => {
     try {
-      // Use the deadline field directly (it's already a combined date+time)
       if (request.deadline) {
-        // Use timezone if available, otherwise use local formatting
+        const rawDeadline: any = request.deadline;
+        const trimmedDeadline = typeof rawDeadline === 'string' ? rawDeadline.trim() : rawDeadline;
+
+        // Case 1: deadline is time-only like "HH:MM" → combine with request.date
+        if (typeof trimmedDeadline === 'string' && /^\d{1,2}:\d{2}$/.test(trimmedDeadline)) {
+          const dateString = request.date;
+          console.log("date string is: " + dateString)
+          if (dateString && typeof dateString === 'string') {
+            const combined = combineDateAndTime(dateString, trimmedDeadline);
+            if (request.timezone) {
+              return formatDateWithTimezone(combined, 'MMM dd, yyyy HH:mm', request.timezone);
+            }
+            return format(combined, 'MMM dd, yyyy HH:mm');
+          } else {
+            console.log("date string is not: " + dateString)
+          }
+          // No valid date to combine with → just show time
+          return trimmedDeadline;
+        }
+
+        // Else: parse deadline as a date/time value
+        let parsed: Date | null = null;
+        if (typeof rawDeadline === 'string') {
+          // numeric epoch string
+          if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmedDeadline)) {
+            const num = parseFloat(trimmedDeadline);
+            const ms = num < 1e12 ? num * 1000 : num;
+            parsed = new Date(ms);
+          } else {
+            parsed = new Date(trimmedDeadline);
+          }
+        } else if (typeof rawDeadline === 'number') {
+          const ms = rawDeadline < 1e12 ? rawDeadline * 1000 : rawDeadline;
+          parsed = new Date(ms);
+        } else if (rawDeadline && typeof rawDeadline.toDate === 'function') {
+          parsed = rawDeadline.toDate();
+        } else if (rawDeadline instanceof Date) {
+          parsed = rawDeadline;
+        }
+
+        if (!parsed || isNaN(parsed.getTime())) {
+          return 'Invalid date';
+        }
+
+        // Case 2: deadline is a full date → display time only
         if (request.timezone) {
-          return formatDateWithTimezone(request.deadline, 'MMM dd, yyyy HH:mm', request.timezone);
+          // Use Intl for timezone, extracting time only (HH:mm 24h)
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: request.timezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(parsed);
+          return parts;
         }
-        
-        // Handle different date formats
-        const deadlineValue: any = request.deadline;
-        let date: Date;
-        
-        if (typeof deadlineValue === 'string' || typeof deadlineValue === 'number') {
-          date = new Date(deadlineValue);
-        } else if (deadlineValue && typeof deadlineValue.toDate === 'function') {
-          date = deadlineValue.toDate();
-        } else if (deadlineValue instanceof Date) {
-          date = deadlineValue;
-        } else {
-          return 'Invalid date';
-        }
-        
-        if (isNaN(date.getTime())) {
-          return 'Invalid date';
-        }
-        
-        return format(date, 'MMM dd, yyyy HH:mm');
+        return format(parsed, 'HH:mm');
       }
-      
       return 'Not set';
     } catch (error) {
+      console.error('Error formatting deadline:', error);
       return 'Invalid date';
     }
   };
@@ -230,6 +352,8 @@ function RequestCard({ request }: { request: Request }) {
           <Badge className={`text-xs ${getRequestStatusColor(request.request_status)}`}>
             {getRequestStatusLabel(request.request_status)}
           </Badge>
+          {/* Student quick view */}
+          <StudentInfoButton studentId={request.student_id} />
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -294,6 +418,7 @@ function RequestCard({ request }: { request: Request }) {
 function RequestActions({ request }: { request: Request }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState('details');
+  const [descriptionValue, setDescriptionValue] = useState<string>(request.description || '');
   
   const {
     changeRequestStatus,
@@ -305,7 +430,8 @@ function RequestActions({ request }: { request: Request }) {
     completeRequest,
     fetchTutorOffers,
     tutorOffers,
-    loading
+    loading,
+    updateRequest
   } = useRequestManagementStore();
 
   const handleStatusChange = async (status: string, reason?: string) => {
@@ -333,6 +459,19 @@ function RequestActions({ request }: { request: Request }) {
       setIsOpen(false);
     } catch (error) {
       console.error('Error setting prices:', error);
+    }
+  };
+
+  // Sync local description when request changes
+  useEffect(() => {
+    setDescriptionValue(request.description || '');
+  }, [request.description]);
+
+  const handleSaveDescription = async () => {
+    try {
+      await updateRequest(request.id, { description: descriptionValue });
+    } catch (error) {
+      console.error('Error updating description:', error);
     }
   };
 
@@ -368,6 +507,24 @@ function RequestActions({ request }: { request: Request }) {
           
           <TabsContent value="details" className="space-y-4">
             <RequestDetails request={request} />
+            <div className="space-y-2">
+              <Label className="text-sm">Edit Description</Label>
+              <Textarea
+                value={descriptionValue}
+                onChange={(e) => setDescriptionValue(e.target.value)}
+                rows={4}
+                placeholder="Update request description"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveDescription}
+                  disabled={loading || (descriptionValue || '') === (request.description || '')}
+                >
+                  Save Description
+                </Button>
+              </div>
+            </div>
           </TabsContent>
           
           <TabsContent value="status" className="space-y-4">
@@ -459,10 +616,14 @@ export default function RequestsPage() {
     currentPage,
     pageSize,
     hasNextPage,
-    hasPreviousPage
+    hasPreviousPage,
+    totalPages,
+    totalItems
   } = useRequestManagementStore();
 
   const [filters, setFilters] = useState<RequestFilters>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [columnsCount, setColumnsCount] = useState(3);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -483,6 +644,22 @@ export default function RequestsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  // Debounce search term (500ms)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters(prev => {
+        const next = { ...prev } as any;
+        if (debouncedSearchTerm) {
+          next.search = debouncedSearchTerm;
+        } else {
+          delete next.search;
+        }
+        return next;
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     // Initial load - only run once
@@ -529,46 +706,20 @@ export default function RequestsPage() {
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
-    
-    // Always show first 3 pages
-    const firstPages = [1, 2, 3];
-    
-    // If current page is in the first 5 pages, show them all
-    if (currentPage <= 5) {
-      const maxPage = Math.max(currentPage + (hasNextPage ? 2 : 1), 5);
-      for (let i = 1; i <= maxPage; i++) {
-        pages.push(i);
-      }
-      
-      // Add ellipsis if there are more pages ahead
-      if (hasNextPage && currentPage >= 3) {
-        pages.push('...');
-      }
-    } else {
-      // Show first 3 pages
-      pages.push(1, 2, 3);
-      
-      // Add ellipsis after first 3 if current page is far
-      if (currentPage > 5) {
-        pages.push('...');
-      }
-      
-      // Show pages around current page (current - 1, current, current + 1)
-      const start = Math.max(4, currentPage - 1);
-      const end = currentPage + 1;
-      
-      for (let i = start; i <= end; i++) {
-        if (!pages.includes(i)) {
-          pages.push(i);
-        }
-      }
-      
-      // Add ellipsis if there are more pages ahead
-      if (hasNextPage) {
-        pages.push('...');
-      }
+    const total = totalPages || 0;
+    if (total <= 0) return [1];
+    if (total <= 7) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+      return pages;
     }
-    
+    // Always show first and last
+    pages.push(1);
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(total - 1, currentPage + 1);
+    if (start > 2) pages.push('...');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total - 1) pages.push('...');
+    pages.push(total);
     return pages;
   };
 
@@ -662,8 +813,11 @@ export default function RequestsPage() {
               <Label>Search</Label>
               <Input
                 placeholder="Search requests..."
-                value={filters.search || ''}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setDebouncedSearchTerm(e.target.value);
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -706,14 +860,7 @@ export default function RequestsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Country</Label>
-              <Input
-                placeholder="Country"
-                value={filters.country || ''}
-                onChange={(e) => handleFilterChange('country', e.target.value)}
-              />
-            </div>
+            {/* Country filter removed as requested */}
           </div>
         </CardContent>
       </Card>
@@ -723,8 +870,13 @@ export default function RequestsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 className="text-xl font-semibold">Requests ({requests.length})</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
+                <h2 className="text-xl font-semibold">
+                  Requests
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    Showing {requests.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0} - {Math.min(currentPage * pageSize, totalItems || 0)} of {totalItems || 0}
+                  </span>
+                </h2>
                 <div className="flex items-center gap-2">
                   <Label className="text-sm">Items per page:</Label>
                   <Select
@@ -818,7 +970,7 @@ export default function RequestsPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    Showing {requests.length} {requests.length === 1 ? 'request' : 'requests'}
+                    Showing {requests.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0} - {Math.min(currentPage * pageSize, totalItems || 0)} of {totalItems || 0}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

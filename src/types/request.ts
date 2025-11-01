@@ -13,7 +13,7 @@ export interface Request {
   completed: string; // "0" or "1"
   country: string;
   created_at: string | { _seconds: number; _nanoseconds: number };
-  date: string;
+  date: any;
   deadline: string;
   deleted_at: string | null;
   description: string | null;
@@ -149,6 +149,9 @@ export enum BidStatus {
 
 // Helper functions for enums
 export const getRequestTypeLabel = (type: string): string => {
+  if(type === null || type === undefined) {
+    return 'Unknown';
+  }
   switch (type.toLowerCase()) {
     case 'exam':
       return 'Premium Exam Assistance';

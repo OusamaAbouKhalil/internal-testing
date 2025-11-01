@@ -15,6 +15,7 @@ import {
   DocumentSnapshot,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
+import { fetchWithProgress } from '@/lib/api-progress';
 import { db } from '@/config/firebase';
 import { 
   Request, 
@@ -40,6 +41,8 @@ interface RequestManagementStore {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   totalItems: number;
+  totalPages: number;
+  totalPages?: number;
   lastVisibleDoc: QueryDocumentSnapshot | null;
   firstVisibleDoc: QueryDocumentSnapshot | null;
   pageCache: Map<number, { requests: Request[], hasNextPage: boolean, firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }>;
@@ -111,6 +114,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
   hasNextPage: false,
   hasPreviousPage: false,
   totalItems: 0,
+  totalPages: 0,
   lastVisibleDoc: null,
   firstVisibleDoc: null,
   pageCache: new Map(),
@@ -120,104 +124,44 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     try {
       const state = get();
       set({ loading: true, error: null });
-      
-      // Reset to page 1 if not specified
-      const targetPage = pagination?.page || 1;
+
+      const targetPage = pagination?.page || state.currentPage || 1;
       const currentPageSize = pagination?.pageSize || state.pageSize;
-      
-      // Build base query
-      let q = query(
-        collection(db, 'requests'), 
-        orderBy('created_at', 'desc'),
-        limit(currentPageSize + 1) // Fetch one extra to check if there's a next page
-      );
-      
-      // Apply Firestore filters
-      if (filters.assistance_type) {
-        q = query(q, where('assistance_type', '==', filters.assistance_type));
-      }
-      
-      if (filters.request_status) {
-        q = query(q, where('request_status', '==', filters.request_status));
-      }
-      
-      if (filters.country) {
-        q = query(q, where('country', '==', filters.country));
-      }
-      
-      if (filters.language) {
-        q = query(q, where('language', '==', filters.language));
-      }
-      
-      if (filters.subject) {
-        q = query(q, where('subject', '==', filters.subject));
-      }
-      
-      if (filters.student_id) {
-        q = query(q, where('student_id', '==', filters.student_id));
-      }
-      
-      if (filters.tutor_id) {
-        q = query(q, where('tutor_id', '==', filters.tutor_id));
-      }
-      
-      // Add pagination cursor if provided
-      if (pagination?.lastVisible) {
-        q = query(q, startAfter(pagination.lastVisible));
-      }
-      
-      const querySnapshot = await getDocs(q);
-      const docs = querySnapshot.docs;
-      
-      // Check if there's a next page
-      const hasMore = docs.length > currentPageSize;
-      const requestDocs = hasMore ? docs.slice(0, currentPageSize) : docs;
-      
-      const requests = requestDocs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Apply client-side filters
-      let filteredRequests = convertTimestamps(requests);
-      
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        filteredRequests = filteredRequests.filter((request: Request) => 
-          request.label?.toLowerCase().includes(searchTerm) ||
-          request.description?.toLowerCase().includes(searchTerm) ||
-          request.subject?.toLowerCase().includes(searchTerm) ||
-          request.language?.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      if (filters.date_from) {
-        filteredRequests = filteredRequests.filter((request: Request) => {
-          const requestDate = typeof request.date === 'string' 
-            ? new Date(request.date) 
-            : (request.date as any)?.toDate?.() || new Date();
-          return requestDate >= new Date(filters.date_from!);
-        });
-      }
-      
-      if (filters.date_to) {
-        filteredRequests = filteredRequests.filter((request: Request) => {
-          const requestDate = typeof request.date === 'string' 
-            ? new Date(request.date) 
-            : (request.date as any)?.toDate?.() || new Date();
-          return requestDate <= new Date(filters.date_to!);
-        });
-      }
-      
-      set({ 
-        requests: filteredRequests,
-        currentPage: targetPage,
+
+      const response = await fetchWithProgress('/api/requests/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: (filters as any).search || '',
+          page: targetPage,
+          perPage: currentPageSize,
+          filters: {
+            assistance_type: (filters as any).assistance_type,
+            request_status: (filters as any).request_status,
+            country: (filters as any).country,
+            language: (filters as any).language,
+            subject: (filters as any).subject,
+            student_id: (filters as any).student_id,
+            tutor_id: (filters as any).tutor_id,
+          },
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Requests search failed');
+
+      const hits = (result.hits || []).map((h: any) => ({ id: h.id || h.objectID, ...h }));
+      const converted = convertTimestamps(hits);
+
+      set({
+        requests: converted,
+        currentPage: result.page || targetPage,
         pageSize: currentPageSize,
-        hasNextPage: hasMore,
-        hasPreviousPage: targetPage > 1,
-        firstVisibleDoc: requestDocs[0] || null,
-        lastVisibleDoc: requestDocs[requestDocs.length - 1] || null,
-        loading: false 
+        hasNextPage: (result.page || targetPage) < (result.totalPages || 1),
+        hasPreviousPage: (result.page || targetPage) > 1,
+        totalItems: result.total || 0,
+        totalPages: result.totalPages || Math.ceil((result.total || 0) / currentPageSize) || 0,
+        loading: false,
       });
     } catch (error: any) {
       console.error('Error fetching requests:', error);

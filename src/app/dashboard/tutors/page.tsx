@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingOverlay, LoadingButton } from "@/components/ui/loading-spinner";
 import { StatusBadge, NotificationBadge } from "@/components/ui/status-badge";
 import { EnhancedTutorDialog } from "@/components/enhanced-tutor-dialog";
+import { PaginationAdvanced } from "@/components/pagination.advanced";
 import { 
   GraduationCap, 
   Plus, 
@@ -49,12 +50,20 @@ import { getImageUrl } from "@/lib/file-upload";
 
 export default function TutorsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [emailTerm, setEmailTerm] = useState("");
+  const [nicknameTerm, setNicknameTerm] = useState("");
+  const [phoneTerm, setPhoneTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [debouncedEmailTerm, setDebouncedEmailTerm] = useState("");
+  const [debouncedNicknameTerm, setDebouncedNicknameTerm] = useState("");
+  const [debouncedPhoneTerm, setDebouncedPhoneTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<TutorFilters>({});
+  const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'not_verified' | 'deleted' | 'cancelled'>('all');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState({
@@ -67,7 +76,10 @@ export default function TutorsPage() {
     loading, 
     error, 
     totalCount,
+    totalPages,
     hasMore,
+    currentPage,
+    perPage,
     fetchTutors, 
     createTutor, 
     updateTutor, 
@@ -76,7 +88,9 @@ export default function TutorsPage() {
     resetPagination,
     toggleVerification,
     toggleNotifications,
-    toggleCancelled
+    toggleCancelled,
+    setCurrentPage,
+    setPerPage
   } = useTutorManagementStore();
 
   const { hasPermission } = useFirebaseAuthStore();
@@ -108,29 +122,124 @@ export default function TutorsPage() {
     }
   }, [tutors]);
 
-  useEffect(() => {
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+    setCurrentPage(newPage);
+    fetchTutors(filters, newPage);
+  };
+
+  // Handle per page change
+  const handlePerPageChange = (newPerPage: number) => {
+    setPerPage(newPerPage);
     const searchFilters: TutorFilters = {
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
       ...filters
     };
     resetPagination();
-    fetchTutors(searchFilters);
-  }, [searchTerm, filters, resetPagination, fetchTutors]);
+    fetchTutors(searchFilters, 1, 'first');
+  };
+
+  // Debounce search term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Debounce email term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmailTerm(emailTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [emailTerm]);
+
+  // Debounce nickname term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNicknameTerm(nicknameTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [nicknameTerm]);
+
+  // Debounce phone term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneTerm(phoneTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [phoneTerm]);
+
+  useEffect(() => {
+    const searchFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters
+    };
+    resetPagination();
+    fetchTutors(searchFilters, 1, 'first');
+  }, [debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, filters]);
+
+  const handleTabChange = (tab: 'all' | 'verified' | 'not_verified' | 'deleted' | 'cancelled') => {
+    setActiveTab(tab);
+    // Reset related filters, then set tab-specific ones
+    const base = { ...filters, verified: undefined, deleted: undefined, cancelled: undefined } as TutorFilters;
+    if (tab === 'verified') setFilters({ ...base, verified: true });
+    else if (tab === 'not_verified') setFilters({ ...base, verified: false });
+    else if (tab === 'deleted') setFilters({ ...base, deleted: true });
+    else if (tab === 'cancelled') setFilters({ ...base, cancelled: true });
+    else setFilters(base);
+  };
 
   const handleCreateTutor = useCallback(async (tutorData: any) => {
     await createTutor(tutorData);
-  }, [createTutor]);
+    const currentFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchTutors(currentFilters, currentPage);
+  }, [createTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleUpdateTutor = useCallback(async (tutorData: any) => {
     if (!selectedTutor) return;
     await updateTutor(selectedTutor.id, tutorData);
-  }, [selectedTutor, updateTutor]);
+    const currentFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchTutors(currentFilters, currentPage);
+  }, [selectedTutor, updateTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleDeleteTutor = useCallback(async (tutorId: string) => {
     if (confirm('Are you sure you want to delete this tutor?')) {
       await deleteTutor(tutorId);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     }
-  }, [deleteTutor]);
+  }, [deleteTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const openCreateDialog = useCallback(() => {
     setDialogMode('create');
@@ -144,9 +253,6 @@ export default function TutorsPage() {
     setIsEditDialogOpen(true);
   }, []);
 
-  const handleLoadMore = () => {
-    fetchTutors(filters, true);
-  };
 
   const handleImportTutors = async () => {
     try {
@@ -165,6 +271,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_verify');
       const newStatus = currentStatus === '2' ? false : true;
       await toggleVerification(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle verification:', error);
     } finally {
@@ -177,6 +291,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_notif');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleNotifications(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle notifications:', error);
     } finally {
@@ -189,6 +311,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_cancel');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleCancelled(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle cancelled status:', error);
     } finally {
@@ -264,7 +394,13 @@ export default function TutorsPage() {
           <div>
             <h1 className="text-3xl font-bold">Tutors</h1>
             <p className="text-muted-foreground mt-2">Manage tutor accounts and information</p>
-            <p className="text-sm text-muted-foreground mt-1">Total: {totalCount} tutors</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tutors.length > 0 ? (
+                <>Showing {tutors.length} of {totalCount} tutor{totalCount !== 1 ? 's' : ''}</>
+              ) : (
+                <>Total: {totalCount} tutor{totalCount !== 1 ? 's' : ''}</>
+              )}
+            </p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -322,104 +458,86 @@ export default function TutorsPage() {
 
         {/* Search and Filters */}
         <div className="space-y-4">
+          {/* Status Tabs */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'verified', label: 'Verified' },
+              { key: 'not_verified', label: 'Not Verified' },
+              { key: 'deleted', label: 'Deleted' },
+              { key: 'cancelled', label: 'Cancelled' },
+            ].map((tab) => (
+              <Button
+                key={tab.key}
+                variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => handleTabChange(tab.key as any)}
+                className="whitespace-nowrap"
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search by name, email, phone, WhatsApp, country, bio, etc..."
+                placeholder="Search by name, country, etc..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" onClick={() => setShowFilters((v) => !v)} className="whitespace-nowrap">
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
+            <div className="relative flex-1">
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by email..."
+                value={emailTerm}
+                onChange={(e) => setEmailTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search by phone..."
+                value={phoneTerm}
+                onChange={(e) => setPhoneTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
 
-          {showFilters && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Filters</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Verification Status</Label>
-                    <Select
-                      value={filters.verified?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, verified: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="true">Verified</SelectItem>
-                        <SelectItem value="false">Not Verified</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Country</Label>
-                    <Select
-                      value={filters.country || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, country: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Countries" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Countries</SelectItem>
-                        {Array.from(filterOptions.countries).sort((a, b) => a.localeCompare(b)).map((country) => (
-                          <SelectItem key={country} value={country}>
-                            {country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label>Has Requests</Label>
-                    <Select
-                      value={filters.has_requests?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, has_requests: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">With Requests</SelectItem>
-                        <SelectItem value="false">No Requests</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Sign-in Method</Label>
-                    <Select
-                      value={filters.sign_in_method || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="apple">Apple</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {tutors.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
+          </div>
+        )}
         </div>
 
         {/* Error Alert */}
@@ -858,11 +976,16 @@ export default function TutorsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>Joined {typeof tutor.created_at === 'string' ? new Date(tutor.created_at).toLocaleDateString() : new Date((tutor.created_at as any)._seconds * 1000).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      {getSignInMethodIcon(tutor.sign_in_method)}
-                      <span>{getSignInMethodLabel(tutor.sign_in_method)}</span>
+                      <span>
+                        Joined{' '}
+                        {typeof tutor.created_at === 'string'
+                          ? new Date(tutor.created_at).toLocaleDateString()
+                          : typeof tutor.created_at === 'number'
+                            ? new Date(tutor.created_at * 1000).toLocaleDateString()
+                            : (tutor.created_at && typeof tutor.created_at === 'object' && '_seconds' in tutor.created_at
+                                ? new Date((tutor.created_at as any)._seconds * 1000).toLocaleDateString()
+                                : 'Unknown')}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -872,12 +995,33 @@ export default function TutorsPage() {
           </div>
         </LoadingOverlay>
 
-        {/* Load More Button */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleLoadMore} disabled={loading}>
-              Load More Tutors
-            </Button>
+        {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {tutors.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
           </div>
         )}
 

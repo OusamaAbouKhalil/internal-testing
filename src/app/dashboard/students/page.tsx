@@ -218,24 +218,56 @@ export default function StudentsPage() {
 
   const handleCreateStudent = useCallback(async (studentData: any) => {
     await createStudent(studentData);
-  }, [createStudent]);
+    const currentFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchStudents(currentFilters, currentPage);
+  }, [createStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleUpdateStudent = useCallback(async (studentData: any) => {
     if (!selectedStudent) return;
     await updateStudent(selectedStudent.id, studentData);
-  }, [selectedStudent, updateStudent]);
+    const currentFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchStudents(currentFilters, currentPage);
+  }, [selectedStudent, updateStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleDeleteStudent = useCallback(async (studentId: string) => {
     if (confirm('Are you sure you want to delete this student?')) {
       await deleteStudent(studentId);
+      const currentFilters: StudentFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone_number: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchStudents(currentFilters, currentPage);
     }
-  }, [deleteStudent]);
+  }, [deleteStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleToggleVerification = async (studentId: string, currentStatus: string) => {
     try {
       setActionLoading(studentId + '_verify');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleVerification(studentId, newStatus);
+      const currentFilters: StudentFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone_number: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchStudents(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle verification:', error);
     } finally {

@@ -374,6 +374,7 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                       placeholder="Enter email address"
                       value={formData.email}
                       onChange={(e) => handleFieldChange('email', e.target.value)}
+                      autoComplete="off"
                       required
                       className={emailError ? 'border-red-500' : ''}
                     />
@@ -399,6 +400,8 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                         value={formData.password}
                         onChange={(e) => handleFieldChange('password', e.target.value)}
                         required={mode === 'create'}
+                        autoComplete="new-password"
+                        name="new-password"
                         className={passwordError && formData.password ? 'border-red-500' : ''}
                       />
                       <Button
@@ -426,6 +429,8 @@ export const EnhancedTutorDialog = React.memo(function EnhancedTutorDialog({
                         value={formData.confirmPassword}
                         onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
                         required={mode === 'create'}
+                        autoComplete="new-password"
+                        name="confirm-new-password"
                         className={passwordError ? 'border-red-500' : ''}
                       />
                       <Button

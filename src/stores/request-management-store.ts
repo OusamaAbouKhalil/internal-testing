@@ -41,7 +41,6 @@ interface RequestManagementStore {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   totalItems: number;
-  totalPages: number;
   totalPages?: number;
   lastVisibleDoc: QueryDocumentSnapshot | null;
   firstVisibleDoc: QueryDocumentSnapshot | null;

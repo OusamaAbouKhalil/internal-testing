@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAlgoliaClient, getTutorsIndexName } from '@/config/algolia';
+import { adminDb } from '@/config/firebase-admin';
 
 type SearchBody = {
   query?: string;
@@ -132,5 +133,48 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('Algolia search error:', err);
     return NextResponse.json({ success: false, error: err?.message || 'Search failed' }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email');
+
+    if (!email) {
+      return NextResponse.json(
+        { success: false, error: 'Email parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    // Search for tutors by email
+    const tutorsQuery = await adminDb
+      .collection('tutors')
+      .where('email', '>=', email)
+      .where('email', '<=', email + '\uf8ff')
+      .where('deleted_at', '==', null)
+      .limit(10)
+      .get();
+
+    const tutors = tutorsQuery.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    return NextResponse.json({
+      success: true,
+      tutors
+    });
+
+  } catch (error) {
+    console.error('❌ Tutor search error:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to search tutors' 
+      },
+      { status: 500 }
+    );
   }
 }

@@ -36,7 +36,8 @@ import {
   Ban,
   BookOpen,
   Award,
-  Languages
+  Languages,
+  RotateCcw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useTutorManagementStore } from "@/stores/tutor-management-store";
@@ -84,6 +85,7 @@ export default function TutorsPage() {
     createTutor, 
     updateTutor, 
     deleteTutor,
+    restoreTutor,
     importTutors,
     resetPagination,
     toggleVerification,
@@ -202,6 +204,19 @@ export default function TutorsPage() {
     else setFilters(base);
   };
 
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
+    setEmailTerm('');
+    setNicknameTerm('');
+    setPhoneTerm('');
+    setDebouncedSearchTerm('');
+    setDebouncedEmailTerm('');
+    setDebouncedNicknameTerm('');
+    setDebouncedPhoneTerm('');
+    setActiveTab('all');
+  };
+
   const handleCreateTutor = useCallback(async (tutorData: any) => {
     await createTutor(tutorData);
     const currentFilters: TutorFilters = {
@@ -240,6 +255,25 @@ export default function TutorsPage() {
       fetchTutors(currentFilters, currentPage);
     }
   }, [deleteTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
+
+  const handleRestoreTutor = useCallback(async (tutorId: string) => {
+    try {
+      setActionLoading(tutorId + '_restore');
+      await restoreTutor(tutorId);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
+    } catch (error: any) {
+      alert(`Failed to restore tutor: ${error.message || 'Unknown error'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [restoreTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const openCreateDialog = useCallback(() => {
     setDialogMode('create');
@@ -386,6 +420,81 @@ export default function TutorsPage() {
     }
   };
 
+  const formatDateOfBirth = (value: any): string => {
+    if (value === undefined || value === null) return 'Not set';
+    
+    // If it's already a string that's not a valid date format, return it as-is
+    if (typeof value === 'string' && value.trim() !== '') {
+      const trimmed = value.trim();
+      // If it's not a numeric or date-like string, return it as-is
+      if (!/^\d/.test(trimmed) && !trimmed.includes('-') && !trimmed.includes('/')) {
+        return trimmed;
+      }
+    }
+    
+    try {
+      let date: Date | null = null;
+
+      // Firestore Timestamp instance with toDate()
+      if (value && typeof value.toDate === 'function') {
+        date = value.toDate();
+      }
+      // Firestore-like object with seconds/_seconds and optional nanoseconds
+      else if (value && typeof value === 'object' && (
+          ('seconds' in value) || ('_seconds' in value)
+        )) {
+        const seconds = (value.seconds ?? value._seconds) as number;
+        const nanos = (value.nanoseconds ?? value._nanoseconds ?? 0) as number;
+        if (typeof seconds === 'number') {
+          date = new Date(seconds * 1000 + Math.floor(nanos / 1e6));
+        }
+      }
+      // Native Date
+      else if (value instanceof Date) {
+        date = value;
+      }
+      // Numeric epoch (ms or seconds)
+      else if (typeof value === 'number') {
+        // Heuristic: < 1e12 => seconds, else milliseconds
+        const ms = value < 1e12 ? value * 1000 : value;
+        date = new Date(ms);
+      }
+      // String input (ISO, RFC, or numeric string)
+      else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') return 'Not set';
+        // If purely numeric (or numeric with decimal), treat as epoch
+        if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmed)) {
+          const num = parseFloat(trimmed);
+          const ms = num < 1e12 ? num * 1000 : num;
+          date = new Date(ms);
+        } else {
+          date = new Date(trimmed);
+        }
+      }
+
+      if (!date || isNaN(date.getTime())) {
+        // If date parsing failed and it's a string, return the string as-is
+        if (typeof value === 'string') {
+          return value;
+        }
+        return 'Invalid date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      // If parsing fails and it's a string, return the string as-is
+      if (typeof value === 'string') {
+        return value;
+      }
+      return 'Invalid date';
+    }
+  };
+
   return (
     <AuthGuard requiredPermission={{ resource: 'tutors', action: 'read' }}>
       <div className="space-y-6">
@@ -457,59 +566,74 @@ export default function TutorsPage() {
         </div>
 
         {/* Search and Filters */}
-        <div className="space-y-4">
-          {/* Status Tabs */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'verified', label: 'Verified' },
-              { key: 'not_verified', label: 'Not Verified' },
-              { key: 'deleted', label: 'Deleted' },
-              { key: 'cancelled', label: 'Cancelled' },
-            ].map((tab) => (
-              <Button
-                key={tab.key}
-                variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleTabChange(tab.key as any)}
-                className="whitespace-nowrap"
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Filters</CardTitle>
+              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || Object.keys(filters).length > 0 || activeTab !== 'all') && (
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Status Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'verified', label: 'Verified' },
+                  { key: 'not_verified', label: 'Not Verified' },
+                  { key: 'deleted', label: 'Deleted' },
+                  { key: 'cancelled', label: 'Cancelled' },
+                ].map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTabChange(tab.key as any)}
+                    className="whitespace-nowrap"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by name, country, etc..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by name, country, etc..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by email..."
+                    value={emailTerm}
+                    onChange={(e) => setEmailTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by phone..."
+                    value={phoneTerm}
+                    onChange={(e) => setPhoneTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="relative flex-1">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by email..."
-                value={emailTerm}
-                onChange={(e) => setEmailTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="relative flex-1">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by phone..."
-                value={phoneTerm}
-                onChange={(e) => setPhoneTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+          </CardContent>
+        </Card>
 
-                  {/* Pagination Controls - Top */}
+        {/* Pagination Controls - Top */}
         {!loading && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -538,7 +662,6 @@ export default function TutorsPage() {
             )}
           </div>
         )}
-        </div>
 
         {/* Error Alert */}
         {error && (
@@ -684,20 +807,39 @@ export default function TutorsPage() {
                             size="sm"
                             onClick={() => openEditDialog(tutor)}
                             className="hover:bg-blue-50 hover:border-blue-200"
+                            title="Edit tutor"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </>
                       )}
                       
-                      {hasPermission('tutors', 'delete') && (
+                      {hasPermission('tutors', 'delete') && !tutor.deleted_at && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteTutor(tutor.id)}
                           className="hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                          title="Delete tutor"
                         >
                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {hasPermission('tutors', 'write') && tutor.deleted_at && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestoreTutor(tutor.id)}
+                          disabled={actionLoading === tutor.id + '_restore'}
+                          className="hover:bg-green-50 hover:border-green-200 hover:text-green-600"
+                          title="Restore tutor"
+                        >
+                          {actionLoading === tutor.id + '_restore' ? (
+                            <span className="h-4 w-4 animate-spin">⟳</span>
+                          ) : (
+                            <RotateCcw className="h-4 w-4" />
+                          )}
                         </Button>
                       )}
                     </div>
@@ -785,11 +927,7 @@ export default function TutorsPage() {
                           Date of Birth
                         </h4>
                         <p className="text-sm font-medium">
-                          {new Date(tutor.date_of_birth).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {formatDateOfBirth(tutor.date_of_birth)}
                         </p>
                       </div>
                     )}

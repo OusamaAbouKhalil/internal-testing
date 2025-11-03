@@ -32,7 +32,9 @@ import {
   Globe,
   Languages,
   CheckCircle,
-  XCircle
+  XCircle,
+  Copy,
+  Check
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useStudentManagementStore } from "@/stores/student-management-store";
@@ -62,6 +64,7 @@ export default function StudentsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'not_verified' | 'deleted' | 'banned'>('all');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState({
     countries: new Set<string>(),
     nationalities: new Set<string>()
@@ -216,6 +219,19 @@ export default function StudentsPage() {
     else setFilters(base);
   };
 
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
+    setEmailTerm('');
+    setNicknameTerm('');
+    setPhoneTerm('');
+    setDebouncedSearchTerm('');
+    setDebouncedEmailTerm('');
+    setDebouncedNicknameTerm('');
+    setDebouncedPhoneTerm('');
+    setActiveTab('all');
+  };
+
   const handleCreateStudent = useCallback(async (studentData: any) => {
     await createStudent(studentData);
     const currentFilters: StudentFilters = {
@@ -355,6 +371,16 @@ export default function StudentsPage() {
     }
   };
 
+  const handleCopyId = async (studentId: string) => {
+    try {
+      await navigator.clipboard.writeText(studentId);
+      setCopiedId(studentId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
   return (
     <AuthGuard requiredPermission={{ resource: 'students', action: 'read' }}>
       <div className="space-y-6">
@@ -372,130 +398,96 @@ export default function StudentsPage() {
             </p>
           </div>
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
+           
             
-            {hasPermission('students', 'write') && (
-              <>
-                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Import
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Import Students</DialogTitle>
-                      <DialogDescription>
-                        Import students from the JSON file.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        This will import all students from the students.json file.
-                      </p>
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleImportStudents} disabled={loading}>
-                          Import Students
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <LoadingButton
-                  onClick={openCreateDialog}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Student
-                </LoadingButton>
-              </>
-            )}
           </div>
         </div>
 
         {/* Search and Filters */}
-        <div className="space-y-4">
-          {/* Status Tabs */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'verified', label: 'Verified' },
-              { key: 'not_verified', label: 'Not Verified' },
-              { key: 'deleted', label: 'Deleted' },
-              { key: 'banned', label: 'Banned' },
-            ].map((tab) => (
-              <Button
-                key={tab.key}
-                variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleTabChange(tab.key as any)}
-                className="whitespace-nowrap"
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Filters</CardTitle>
+              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || Object.keys(filters).length > 0 || activeTab !== 'all') && (
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Status Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'verified', label: 'Verified' },
+                  { key: 'not_verified', label: 'Not Verified' },
+                  { key: 'deleted', label: 'Deleted' },
+                  { key: 'banned', label: 'Banned' },
+                ].map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTabChange(tab.key as any)}
+                    className="whitespace-nowrap"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by name, country, etc..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by name, country, etc..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by email..."
+                    value={emailTerm}
+                    onChange={(e) => setEmailTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by phone..."
+                    value={phoneTerm}
+                    onChange={(e) => setPhoneTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Label className="text-sm font-medium">Sign-in Method</Label>
+                  <Select
+                    value={filters.sign_in_method || "all"}
+                    onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="facebook">Facebook</SelectItem>
+                      <SelectItem value="google">Google</SelectItem>
+                      <SelectItem value="apple">Apple</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <div className="relative flex-1">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by email..."
-                value={emailTerm}
-                onChange={(e) => setEmailTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="relative flex-1">
-              <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search by phone..."
-                value={phoneTerm}
-                onChange={(e) => setPhoneTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="relative flex-1">
-              <Label className="text-sm font-medium">Sign-in Method</Label>
-              <Select
-                value={filters.sign_in_method || "all"}
-                onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="google">Google</SelectItem>
-                  <SelectItem value="apple">Apple</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Error Alert */}
         {error && (
@@ -573,7 +565,26 @@ export default function StudentsPage() {
                               @{student.nickname}
                             </p>
                           )}
-                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground">
+                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <span className="text-xs font-medium">ID:</span>
+                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                                {student.id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 hover:bg-muted"
+                                onClick={() => handleCopyId(student.id)}
+                                title={copiedId === student.id ? 'Copied!' : 'Copy ID'}
+                              >
+                                {copiedId === student.id ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </span>
                             <span className="flex items-center gap-1">
                               <Mail className="h-4 w-4" />
                               {student.email}

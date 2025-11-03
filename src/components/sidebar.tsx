@@ -28,7 +28,8 @@ import {
   Hash,
   HelpCircle,
   Smartphone,
-  Key
+  Key,
+  TrendingUp
 } from "lucide-react";
 import Image from 'next/image';
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
@@ -40,16 +41,22 @@ interface SidebarProps {
 const getNavigationItems = (hasPermission: (resource: string, action: string) => boolean) => [
   { name: "Dashboard", href: "/dashboard", icon: Home, permission: null },
   { 
+    name: "Reports", 
+    href: "/dashboard/reports", 
+    icon: TrendingUp, 
+    permission: { resource: 'reports', action: 'read' } 
+  },
+  { 
     name: "Customer Support", 
     href: "/dashboard/support", 
     icon: Headphones, 
-    permission: null // Temporarily remove permission check for testing
+    permission: { resource: 'customer-support', action: 'read' }  // Temporarily remove permission check for testing
   },
   { 
     name: "Requests", 
     href: "/dashboard/requests", 
     icon: FileText, 
-    permission: { resource: 'tutors', action: 'read' } 
+    permission: { resource: 'requests', action: 'read' } 
   },
   { 
     name: "Students", 

@@ -39,11 +39,7 @@ export async function POST(request: Request) {
 
     if (f.verified !== undefined) {
         filtersParts.push(`verified:"${f.verified === '1' ? '1' : '0'}"`);
-        if(f.verified === '1') {
-          filtersParts.push(`is_deleted:0`);
-        } else {
-          filtersParts.push(`is_deleted:1`);
-        }
+        filtersParts.push(`is_deleted:0`);
     }
     if (f.is_banned !== undefined) {
     filtersParts.push(`is_banned:"${f.is_banned === '1' ? '1' : '0'}"`);

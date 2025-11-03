@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useFirebaseAuthStore } from '@/stores/firebase-auth-store';
 import {
   Search,
   Send,
@@ -28,11 +29,20 @@ import {
   UserMinus,
   XCircle,
   CheckCircle,
-  Headphones
+  Headphones,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '@/config/firebase';
 import { collection, query, orderBy, onSnapshot, where, limit, getDocs, Timestamp } from 'firebase/firestore';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
 
 // Message type enums matching the app side
 enum CustomerSupportMessageSenderType {
@@ -109,6 +119,9 @@ export function CustomerSupportUI({
   currentUserType = 'admin', 
   currentUserId 
 }: CustomerSupportUIProps) {
+  const { hasPermission } = useFirebaseAuthStore();
+  const canSendMessages = hasPermission('customer-support', 'write') || hasPermission('customer-support', 'send_message');
+  
   const [rooms, setRooms] = useState<SupportRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<SupportRoom | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -122,6 +135,9 @@ export function CustomerSupportUI({
   const [isAgentConnected, setIsAgentConnected] = useState(false);
   const [joiningChat, setJoiningChat] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   
   // Agent names for random assignment
   const agentNames = ['Jonathan', 'William', 'James', 'Grace', 'Chloe', 'Krystel'];
@@ -228,6 +244,11 @@ export function CustomerSupportUI({
 
   // Join chat as agent
   const joinChat = async (roomId: string) => {
+    if (!canSendMessages) {
+      setError("You don't have permission to send messages");
+      return;
+    }
+    
     try {
       setJoiningChat(true);
       setError(null);
@@ -284,7 +305,7 @@ export function CustomerSupportUI({
 
   // Send "anything else" message
   const sendAnythingElseMessage = async () => {
-    if (!selectedRoom) return;
+    if (!selectedRoom || !canSendMessages) return;
     
     try {
       setError(null);
@@ -370,7 +391,7 @@ export function CustomerSupportUI({
 
   // Send message
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedRoom || sending) return;
+    if (!newMessage.trim() || !selectedRoom || sending || !canSendMessages) return;
 
     try {
       setSending(true);
@@ -404,6 +425,83 @@ export function CustomerSupportUI({
     } finally {
       setSending(false);
     }
+  };
+
+  // Edit message
+  const editMessage = async (messageId: string) => {
+    if (!editText.trim() || !selectedRoom) return;
+
+    try {
+      setError(null);
+      
+      const response = await fetch(`/api/support/messages/${messageId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: editText.trim(),
+          room_id: selectedRoom.id,
+          user_type: currentUserType || 'admin',
+          message_type: 'text'
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setEditingMessageId(null);
+        setEditText('');
+        // Real-time listener will automatically update messages
+      } else {
+        setError(data.error || 'Failed to edit message');
+      }
+    } catch (err) {
+      console.error('Error editing message:', err);
+      setError('Failed to edit message');
+    }
+  };
+
+  // Delete message
+  const deleteMessage = async (messageId: string) => {
+    if (!selectedRoom) return;
+    
+    if (!confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    try {
+      setDeletingMessageId(messageId);
+      setError(null);
+      
+      const response = await fetch(
+        `/api/support/messages/${messageId}/delete?room_id=${selectedRoom.id}&user_type=${currentUserType || 'admin'}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        setError(data.error || 'Failed to delete message');
+      }
+      // Real-time listener will automatically update messages
+    } catch (err) {
+      console.error('Error deleting message:', err);
+      setError('Failed to delete message');
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
+  // Start editing a message
+  const startEditing = (message: SupportMessage) => {
+    // Only allow editing text messages
+    if (message.message_type !== 'text') {
+      setError('Only text messages can be edited');
+      return;
+    }
+    setEditingMessageId(message.id);
+    setEditText(message.message);
   };
 
   // Filter rooms based on search and tab
@@ -1072,10 +1170,11 @@ export function CustomerSupportUI({
                     {!isAgentConnected ? (
                       <Button 
                         onClick={() => joinChat(selectedRoom.id)}
-                        disabled={joiningChat}
+                        disabled={joiningChat || !canSendMessages}
                         variant="outline" 
                         size="sm"
                         className="bg-green-600 border-green-500 hover:bg-green-700 text-white"
+                        title={!canSendMessages ? "You don't have permission to send messages" : "Join Chat"}
                       >
                         {joiningChat ? (
                           <LoadingSpinner size="sm" />
@@ -1089,6 +1188,7 @@ export function CustomerSupportUI({
                     ) : (
                       <Button 
                         onClick={leaveChat}
+                        disabled={!canSendMessages}
                         variant="outline" 
                         size="sm"
                         className="bg-red-600 border-red-500 hover:bg-red-700 text-white"
@@ -1100,9 +1200,11 @@ export function CustomerSupportUI({
                     {isAgentConnected && (
                       <Button 
                         onClick={sendAnythingElseMessage}
+                        disabled={!canSendMessages}
                         variant="outline" 
                         size="sm"
                         className="bg-blue-600 border-blue-500 hover:bg-blue-700 text-white"
+                        title={!canSendMessages ? "You don't have permission to send messages" : "Send 'Anything Else?' message"}
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Anything Else?
@@ -1159,6 +1261,12 @@ export function CustomerSupportUI({
                     );
                   }
 
+                  // Check if this message is being edited
+                  const isEditing = editingMessageId === message.id;
+                  const isDeleting = deletingMessageId === message.id;
+                  // Admin can edit/delete any message (student, tutor, or admin messages)
+                  const canEditDelete = currentUserType === 'admin';
+
                   return (
                     <div
                       key={message.id}
@@ -1171,24 +1279,119 @@ export function CustomerSupportUI({
                           </AvatarFallback>
                         </Avatar>
                       )}
-                      <div className={`max-w-[70%] ${message.user_type === 'admin' ? 'order-1' : 'order-2'}`}>
-                        <div className={`rounded-lg p-3 ${
-                          message.user_type === 'admin' 
-                            ? 'bg-purple-600 text-white' 
-                            : 'bg-muted'
-                        }`}>
-                          {renderMessageContent(message)}
-                          <p 
-                            className={`text-xs mt-1 cursor-help ${
-                              message.user_type === 'admin' 
-                                ? 'text-purple-200' 
-                                : 'text-muted-foreground'
-                            }`}
-                            title={formatFullTime(message.created_at)}
-                          >
-                            {formatMessageTime(message.created_at)}
-                          </p>
-                        </div>
+                      <div className={`max-w-[70%] flex flex-col gap-1 ${message.user_type === 'admin' ? 'order-1 items-end' : 'order-2 items-start'}`}>
+                        {isEditing ? (
+                          <div className={`rounded-lg p-3 w-full ${
+                            message.user_type === 'admin' 
+                              ? 'bg-purple-600 text-white' 
+                              : 'bg-muted'
+                          }`}>
+                            <Textarea
+                              value={editText}
+                              onChange={(e) => setEditText(e.target.value)}
+                              className={`flex-1 min-h-[80px] ${
+                                message.user_type === 'admin' 
+                                  ? 'bg-purple-700 text-white border-purple-500' 
+                                  : 'bg-background'
+                              }`}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  editMessage(message.id);
+                                }
+                                if (e.key === 'Escape') {
+                                  setEditingMessageId(null);
+                                  setEditText('');
+                                }
+                              }}
+                              autoFocus
+                            />
+                            <div className="flex gap-2 mt-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingMessageId(null);
+                                  setEditText('');
+                                }}
+                                className="h-7"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => editMessage(message.id)}
+                                className="h-7"
+                                disabled={!editText.trim()}
+                              >
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`rounded-lg p-3 relative group ${
+                            message.user_type === 'admin' 
+                              ? 'bg-purple-600 text-white' 
+                              : 'bg-muted'
+                          }`}>
+                            {canEditDelete && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={`absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                      message.user_type === 'admin'
+                                        ? 'hover:bg-purple-700 text-purple-100'
+                                        : 'hover:bg-muted-foreground/10'
+                                    }`}
+                                    disabled={isDeleting}
+                                  >
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align={message.user_type === 'admin' ? 'end' : 'start'}>
+                                  {message.message_type === 'text' && (
+                                    <DropdownMenuItem onClick={() => startEditing(message)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem 
+                                    onClick={() => deleteMessage(message.id)}
+                                    variant="destructive"
+                                    disabled={isDeleting}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                            {renderMessageContent(message)}
+                            <p 
+                              className={`text-xs mt-1 cursor-help ${
+                                message.user_type === 'admin' 
+                                  ? 'text-purple-200' 
+                                  : 'text-muted-foreground'
+                              }`}
+                              title={formatFullTime(message.created_at)}
+                            >
+                              {formatMessageTime(message.created_at)}
+                              {(() => {
+                                // Check if message was edited
+                                const createdTime = message.created_at instanceof Timestamp 
+                                  ? message.created_at.toMillis() 
+                                  : new Date(message.created_at).getTime();
+                                const updatedTime = message.updated_at instanceof Timestamp 
+                                  ? message.updated_at.toMillis() 
+                                  : new Date(message.updated_at).getTime();
+                                const wasEdited = message.updated_at && updatedTime > createdTime + 1000; // 1 second buffer
+                                return wasEdited ? <span className="ml-1 italic">(edited)</span> : null;
+                              })()}
+                            </p>
+                          </div>
+                        )}
                       </div>
                       {message.user_type === 'admin' && (
                         <Avatar className="h-8 w-8 flex-shrink-0">
@@ -1206,28 +1409,40 @@ export function CustomerSupportUI({
 
             {/* Message Input */}
             <div className="p-4 border-t border-border bg-card">
-              <div className="flex space-x-2">
-                <Textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={isAgentConnected ? "Type your message..." : "Join the chat to start messaging"}
-                  className="flex-1 bg-background border-input placeholder-muted-foreground resize-none"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                />
-                <Button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim() || sending}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4"
-                >
-                  {sending ? <LoadingSpinner size="sm" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
+              {!canSendMessages ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-yellow-600" />
+                    <p className="text-sm text-yellow-800">
+                      You don't have permission to send messages. Please contact your administrator.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex space-x-2">
+                  <Textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder={isAgentConnected ? "Type your message..." : "Join the chat to start messaging"}
+                    className="flex-1 bg-background border-input placeholder-muted-foreground resize-none"
+                    rows={1}
+                    disabled={!canSendMessages}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim() || sending || !canSendMessages}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4"
+                  >
+                    {sending ? <LoadingSpinner size="sm" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
+              )}
               {!isAgentConnected && (
                 <>
                   <div className="mt-3 bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">

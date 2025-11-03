@@ -92,6 +92,7 @@ export async function POST(request: Request) {
           'tutor_paid',
           'tutor_accepted',
           'tutor_meeting_url',
+          'cancel_reason',
         ],
       },
     });

@@ -45,12 +45,13 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useFirebaseAuthStore } from '@/stores/firebase-auth-store';
 
 function StudentInfoButton({ studentId }: { studentId?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [student, setStudent] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-
+  const { hasPermission } = useFirebaseAuthStore();
   useEffect(() => {
     if (isOpen && studentId && !student && !loading) {
       setLoading(true);
@@ -197,6 +198,7 @@ function ChatButton({ request }: { request: Request }) {
 }
 
 function RequestCard({ request }: { request: Request }) {
+  const { hasPermission } = useFirebaseAuthStore();
 	const formatDate = (value: any) => {
     console.log("date is: " + value)
 		if (value === undefined || value === null) return 'Not set';
@@ -358,6 +360,18 @@ function RequestCard({ request }: { request: Request }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
+
+          {request.cancel_reason && (
+            <div className="flex justify-between text-sm gap-2">
+              <span className="text-muted-foreground flex-shrink-0">Cancel Reason:</span>
+              <span className="font-medium text-right truncate">{request.cancel_reason}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between text-sm gap-2">
+            <span className="text-muted-foreground flex-shrink-0">Exam Type:</span>
+            <span className="font-medium text-right truncate">{request.exam_type || 'N/A'}</span>
+          </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Subject:</span>
             <span className="font-medium text-right truncate">{request.subject}</span>
@@ -379,18 +393,43 @@ function RequestCard({ request }: { request: Request }) {
         <div className="border-t pt-3">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
-              <span className="text-muted-foreground">Student Price:</span>
-              <div className="font-semibold text-green-600">${request.student_price}</div>
+              {/* Show Student Price only if user has 'requests:request_student_price' permission */}
+              {hasPermission('requests', 'request_student_price') ? (
+                <>
+                  <span className="text-muted-foreground">Student Price:</span>
+                  <div className="font-semibold text-green-600">${request.student_price}</div>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">Student Price:</span>
+                  <div className="font-semibold text-green-600">Hidden</div>
+                </>
+              )}
             </div>
             <div>
-              <span className="text-muted-foreground">Tutor Price:</span>
-              <div className="font-semibold text-blue-600">${request.tutor_price}</div>
+              {/* Show Tutor Price only if user has 'requests:request_tutor_price' permission */}
+              {hasPermission('requests', 'request_tutor_price') ? (
+                <>
+                  <span className="text-muted-foreground">Tutor Price:</span>
+                  <div className="font-semibold text-blue-600">${request.tutor_price}</div>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">Tutor Price:</span>
+                  <div className="font-semibold text-blue-600">Hidden</div>
+                </>
+              )}
             </div>
           </div>
         </div>
         
         <div className="border-t pt-3">
           <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duration:</span>
+              <span className="font-medium">{request.duration ? `${request.duration}` : 'N/A'}</span>
+            </div>
+            
             <div className="flex justify-between">
               <span className="text-muted-foreground">Deadline:</span>
               <span className="font-medium">{formatDeadline(request)}</span>
@@ -684,6 +723,8 @@ export default function RequestsPage() {
 
   const handleClearFilters = () => {
     setFilters({});
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
   };
 
   const handleNextPage = () => {

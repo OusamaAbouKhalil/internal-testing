@@ -32,6 +32,7 @@ interface TutorManagementStore {
   createTutor: (tutorData: CreateTutorData) => Promise<void>;
   updateTutor: (tutorId: string, tutorData: UpdateTutorData) => Promise<void>;
   deleteTutor: (tutorId: string) => Promise<void>;
+  restoreTutor: (tutorId: string) => Promise<void>;
   toggleVerification: (tutorId: string, verified: boolean) => Promise<void>;
   getTutorById: (tutorId: string) => Promise<Tutor | null>;
   importTutors: (tutors: Tutor[]) => Promise<void>;
@@ -284,6 +285,38 @@ export const useTutorManagementStore = create<TutorManagementStore>((set, get) =
       console.error('Error deleting tutor:', error);
       set({ 
         error: error.message || 'Failed to delete tutor',
+        loading: false 
+      });
+      throw error;
+    }
+  },
+
+  restoreTutor: async (tutorId) => {
+    try {
+      set({ loading: true, error: null });
+      
+      // Call API route to restore tutor with conflict checking
+      const response = await fetchWithProgress('/api/tutors/restore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tutorId }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to restore tutor');
+      }
+
+      console.log('✅ Tutor restored successfully:', tutorId);
+      
+      set({ loading: false });
+    } catch (error: any) {
+      console.error('Error restoring tutor:', error);
+      set({ 
+        error: error.message || 'Failed to restore tutor',
         loading: false 
       });
       throw error;

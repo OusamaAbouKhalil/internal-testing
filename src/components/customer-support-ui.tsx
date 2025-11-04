@@ -650,9 +650,6 @@ export function CustomerSupportUI({
               className="max-w-full rounded-lg cursor-pointer" 
               onClick={() => window.open(imageUrl, '_blank')} 
             />
-            {message.message && !isImagePath && message.message !== message.url && !message.message.startsWith('http') && (
-              <p className="text-sm mt-2">{message.message}</p>
-            )}
           </div>
         );
       
@@ -725,25 +722,18 @@ export function CustomerSupportUI({
             >
               Your browser does not support the audio element.
             </audio>
-            {message.message && !isAudioPath && message.message !== message.url && !message.message.startsWith('http') && (
-              <p className="text-sm mt-2">{message.message}</p>
-            )}
           </div>
         );
       
       case CustomerSupportMessageType.VIDEO:
         const videoUrl = getFullUrl(message.url || message.message);
         // Hide the message if it's just a storage path
-        const isVideoPath = message.message && (message.message.startsWith('/live/storage/') || message.message.startsWith('/storage/') || message.message === videoUrl);
         return (
           <div>
             <video controls className="max-w-full rounded-lg">
               <source src={videoUrl} type="video/mp4" />
               Your browser does not support the video element.
             </video>
-            {message.message && !isVideoPath && message.message !== message.url && !message.message.startsWith('http') && (
-              <p className="text-sm mt-2">{message.message}</p>
-            )}
           </div>
         );
       
@@ -751,12 +741,14 @@ export function CustomerSupportUI({
         return (
           <div className="flex items-center space-x-2">
             <File className="h-4 w-4" />
-            <span className="text-sm">
+            <a
+              href={getFullUrl(message.url || message.message)}
+              className="text-sm underline text-blue-600 hover:text-blue-800"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {message.file_name || 'File attachment'}
-            </span>
-            {message.message && message.message !== message.url && !message.message.startsWith('http') && (
-              <p className="text-sm mt-2">{message.message}</p>
-            )}
+            </a>
           </div>
         );
       
@@ -1002,7 +994,7 @@ export function CustomerSupportUI({
   }, [messages]);
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-background overflow-hidden rounded-lg">
+    <div className="flex h-[calc(100vh-3rem)] bg-background overflow-hidden rounded-lg">
       {/* Left Panel - Conversation List */}
       <div className="w-1/3 border-r border-border bg-card flex flex-col">
         {/* Header */}

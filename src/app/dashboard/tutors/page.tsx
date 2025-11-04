@@ -394,33 +394,7 @@ export default function TutorsPage() {
     return '👤';
   };
 
-  const getSignInMethodIcon = (signInMethod?: string) => {
-    switch (signInMethod) {
-      case 'facebook':
-        return <User className="h-4 w-4 text-blue-600" />;
-      case 'google':
-        return <Globe className="h-4 w-4 text-red-500" />;
-      case 'apple':
-        return <Apple className="h-4 w-4 text-foreground" />;
-      default:
-        return <User className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const getSignInMethodLabel = (signInMethod?: string) => {
-    switch (signInMethod) {
-      case 'facebook':
-        return 'Facebook';
-      case 'google':
-        return 'Google';
-      case 'apple':
-        return 'Apple';
-      default:
-        return 'Manual';
-    }
-  };
-
-  const formatDateOfBirth = (value: any): string => {
+  const formatDate = (value: any): string => {
     if (value === undefined || value === null) return 'Not set';
     
     // If it's already a string that's not a valid date format, return it as-is
@@ -927,7 +901,7 @@ export default function TutorsPage() {
                           Date of Birth
                         </h4>
                         <p className="text-sm font-medium">
-                          {formatDateOfBirth(tutor.date_of_birth)}
+                          {formatDate(tutor.date_of_birth)}
                         </p>
                       </div>
                     )}
@@ -944,20 +918,7 @@ export default function TutorsPage() {
                         <p className="text-sm font-medium">{tutor.experience_years} years</p>
                       </div>
                     )}
-                    {tutor.major && (
-                      <div>
-                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
-                          <BookOpen className="h-3 w-3" />
-                          Major
-                        </h4>
-                        <p className="text-sm font-medium">
-                          {(() => {
-                            const subject = subjects.find(s => s.id === tutor.major!.toString());
-                            return subject?.label || `Major ID: ${tutor.major}`;
-                          })()}
-                        </p>
-                      </div>
-                    )}
+
                     {tutor.languages && tutor.languages.length > 0 && (
                       <div>
                         <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
@@ -981,7 +942,7 @@ export default function TutorsPage() {
                 </div>
 
                 {/* Skills & Subjects Section - Compact */}
-                {(tutor.skills?.length || tutor.subjects?.length) && (
+                {(tutor.skills?.length || tutor.subjects?.length || (Array.isArray(tutor.majorId) && tutor.majorId.length > 0) || tutor.major) && (
                   <div className="mt-4 pt-4 border-t">
                     <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <BookOpen className="h-3 w-3" />
@@ -1019,6 +980,29 @@ export default function TutorsPage() {
                               );
                             })}
                             
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Majors */}
+                      {((Array.isArray(tutor.majorId) && tutor.majorId.length > 0) || tutor.major) && (
+                        <div>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Majors</h5>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(tutor.majorId) && tutor.majorId.length > 0 ? (
+                              tutor.majorId.map((majorId) => {
+                                const subject = subjects.find(s => s.id == majorId.toString());
+                                return (
+                                  <Badge key={majorId} variant="secondary" className="text-xs bg-purple-100 text-purple-800">
+                                    {subject?.label || `Major ${majorId}`}
+                                  </Badge>
+                                );
+                              })
+                            ) : tutor.major ? (
+                              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800">
+                                {tutor.major}
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
                       )}
@@ -1116,13 +1100,7 @@ export default function TutorsPage() {
                       <Calendar className="h-3 w-3" />
                       <span>
                         Joined{' '}
-                        {typeof tutor.created_at === 'string'
-                          ? new Date(tutor.created_at).toLocaleDateString()
-                          : typeof tutor.created_at === 'number'
-                            ? new Date(tutor.created_at * 1000).toLocaleDateString()
-                            : (tutor.created_at && typeof tutor.created_at === 'object' && '_seconds' in tutor.created_at
-                                ? new Date((tutor.created_at as any)._seconds * 1000).toLocaleDateString()
-                                : 'Unknown')}
+                        {formatDate(tutor.created_at)}
                       </span>
                     </div>
                   </div>

@@ -166,7 +166,7 @@ export const useTutorManagementStore = create<TutorManagementStore>((set, get) =
             nationality: (filters as any).nationality,
             gender: (filters as any).gender,
             has_requests: filters.has_requests,
-          },
+          }
         }),
       });
       const result = await response.json();

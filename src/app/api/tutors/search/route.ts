@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       filtersParts.push(`verified:"${f.verified ? '2' : '0'}"`);
       if(!f.verified) {
         filtersParts.push(`cancelled:"0"`);
-        filtersParts.push(`is_deleted:"0"`);
+        filtersParts.push(`is_deleted:"-1"`);
       }
     }
     if (f.cancelled !== undefined) {
@@ -111,6 +111,10 @@ export async function POST(request: Request) {
           'degree',
           'university',
           'date_of_birth',
+          'majorId',
+          'major',
+          'id_file_link',
+          'certification_file_link',
         ],
       },
     });

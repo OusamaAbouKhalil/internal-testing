@@ -364,29 +364,29 @@ function RequestCard({ request }: { request: Request }) {
           {request.cancel_reason && (
             <div className="flex justify-between text-sm gap-2">
               <span className="text-muted-foreground flex-shrink-0">Cancel Reason:</span>
-              <span className="font-medium text-right truncate">{request.cancel_reason}</span>
+              <span className="font-medium text-right ">{request.cancel_reason}</span>
             </div>
           )}
 
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Exam Type:</span>
-            <span className="font-medium text-right truncate">{request.exam_type || 'N/A'}</span>
+            <span className="font-medium text-right ">{request.exam_type || 'N/A'}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Subject:</span>
-            <span className="font-medium text-right truncate">{request.subject}</span>
+            <span className="font-medium text-right ">{request.subject}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Sub Subject:</span>
-            <span className="font-medium text-right truncate">{request.sub_subject}</span>
+            <span className="font-medium text-right ">{request.sub_subject}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Language:</span>
-            <span className="font-medium text-right truncate">{request.language}</span>
+            <span className="font-medium text-right ">{request.language}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Country:</span>
-            <span className="font-medium text-right truncate">{request.country}</span>
+            <span className="font-medium text-right ">{request.country}</span>
           </div>
         </div>
         

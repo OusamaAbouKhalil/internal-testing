@@ -5,6 +5,7 @@ export interface Tutor {
   version: string;
   send_notifications: string;
   major?: number | null;
+  majorId?: number[] | number | null;
   platform?: string;
   test_user: string;
   deleted_at?: string | null;

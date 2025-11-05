@@ -13,6 +13,7 @@ type SearchBody = {
     subject?: string;
     student_id?: string;
     tutor_id?: string;
+    max_rating?: string; // Maximum rating (e.g., "2" for 2 stars or less)
   };
 };
 
@@ -28,13 +29,28 @@ export async function POST(request: Request) {
     const f = body.filters || {};
 
     if (f.assistance_type) filtersParts.push(`assistance_type:"${f.assistance_type}"`);
-    if (f.request_status) filtersParts.push(`request_status:"${f.request_status}"`);
+    f
+    // If rating filter is applied, ensure status is completed
+    if (f.max_rating !== undefined && f.max_rating !== '') {
+      // Filter by rating (less than or equal to max_rating)
+      // Rating is stored as string/numeric, Algolia supports numeric filters
+      const maxRating = parseFloat(f.max_rating);
+      if (!isNaN(maxRating)) {
+        // Filter for ratings <= maxRating (e.g., "2" means 1 or 2 stars)
+        filtersParts.push(`rating <= ${maxRating}`);
+      }
+      // Automatically filter for completed requests when rating is filtered
+      filtersParts.push(`(request_status:"completed" OR request_status:"tutor_completed")`);
+    } else if (f.request_status) {
+      filtersParts.push(`request_status:"${f.request_status}"`);
+    }
+    
     if (f.country) filtersParts.push(`country:"${f.country}"`);
     if (f.language) filtersParts.push(`language:"${f.language}"`);
     if (f.subject) filtersParts.push(`subject:"${f.subject}"`);
     if (f.student_id) filtersParts.push(`student_id:"${f.student_id}"`);
     if (f.tutor_id) filtersParts.push(`tutor_id:"${f.tutor_id}"`);
-
+    console.log("filtersParts" ,filtersParts)
     const filtersString = filtersParts.join(' AND ');
 
     const client = getAlgoliaClient();

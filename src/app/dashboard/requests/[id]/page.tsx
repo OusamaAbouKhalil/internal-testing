@@ -30,10 +30,8 @@ export default function RequestDetailPage() {
   const requestId = params.id as string;
   
   const {
-    requests,
     loading,
     error,
-    fetchRequests,
     changeRequestStatus,
     assignTutor,
     setTutorPrice,
@@ -43,28 +41,48 @@ export default function RequestDetailPage() {
   } = useRequestManagementStore();
 
   const [request, setRequest] = useState<Request | null>(null);
+  const [requestLoading, setRequestLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('details');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [studentInfo, setStudentInfo] = useState<{ email: string; nickname: string } | null>(null);
   const [tutorInfo, setTutorInfo] = useState<{ email: string; nickname: string } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(false);
 
-  // Find the request from the store
+  // Fetch the specific request directly by ID
   useEffect(() => {
-    if (requestId && requests.length > 0) {
-      const foundRequest = requests.find(req => req.id === requestId);
-      if (foundRequest) {
-        setRequest(foundRequest);
-      }
-    }
-  }, [requestId, requests]);
+    if (!requestId) return;
 
-  // Load requests if not already loaded
-  useEffect(() => {
-    if (requests.length === 0 && !loading) {
-      fetchRequests({});
-    }
-  }, [requests.length, loading, fetchRequests]);
+    const fetchRequest = async () => {
+      setRequestLoading(true);
+      try {
+        const response = await fetch(`/api/requests/${requestId}`);
+        const data = await response.json();
+        
+        if (response.ok && data.request) {
+          // Convert Firestore timestamps if needed
+          const convertedRequest = {
+            ...data.request,
+            created_at: data.request.created_at?._seconds 
+              ? new Date(data.request.created_at._seconds * 1000).toISOString()
+              : data.request.created_at,
+            updated_at: data.request.updated_at?._seconds
+              ? new Date(data.request.updated_at._seconds * 1000).toISOString()
+              : data.request.updated_at,
+          };
+          setRequest(convertedRequest as Request);
+        } else {
+          setRequest(null);
+        }
+      } catch (error) {
+        console.error('Error fetching request:', error);
+        setRequest(null);
+      } finally {
+        setRequestLoading(false);
+      }
+    };
+
+    fetchRequest();
+  }, [requestId]);
 
   // Load user information when request is found
   useEffect(() => {
@@ -128,13 +146,39 @@ export default function RequestDetailPage() {
     }
   }, [request, fetchTutorOffers]);
 
+  // Refresh the current request after any changes
+  const refreshRequest = async () => {
+    if (!requestId) return;
+    
+    try {
+      const response = await fetch(`/api/requests/${requestId}`);
+      const data = await response.json();
+      
+      if (response.ok && data.request) {
+        // Convert Firestore timestamps if needed
+        const convertedRequest = {
+          ...data.request,
+          created_at: data.request.created_at?._seconds 
+            ? new Date(data.request.created_at._seconds * 1000).toISOString()
+            : data.request.created_at,
+          updated_at: data.request.updated_at?._seconds
+            ? new Date(data.request.updated_at._seconds * 1000).toISOString()
+            : data.request.updated_at,
+        };
+        setRequest(convertedRequest as Request);
+      }
+    } catch (error) {
+      console.error('Error refreshing request:', error);
+    }
+  };
+
   const handleStatusChange = async (status: string, reason?: string) => {
     if (!request) return;
     
     try {
       await changeRequestStatus(request.id, status, reason);
-      // Refresh the request data
-      fetchRequests({});
+      // Refresh only this specific request
+      await refreshRequest();
     } catch (error) {
       console.error('Error changing status:', error);
     }
@@ -145,8 +189,8 @@ export default function RequestDetailPage() {
     
     try {
       await assignTutor(request.id, tutorId, tutorPrice);
-      // Refresh the request data
-      fetchRequests({});
+      // Refresh only this specific request
+      await refreshRequest();
     } catch (error) {
       console.error('Error assigning tutor:', error);
     }
@@ -158,8 +202,8 @@ export default function RequestDetailPage() {
     try {
       await setTutorPrice(request.id, tutorPrice ? tutorPrice : '');
       await setStudentPrice(request.id, studentPrice ? studentPrice : '');
-      // Refresh the request data
-      fetchRequests({});
+      // Refresh only this specific request
+      await refreshRequest();
     } catch (error) {
       console.error('Error setting prices:', error);
     }
@@ -206,7 +250,7 @@ export default function RequestDetailPage() {
     }
   };
 
-  if (loading && !request) {
+  if (requestLoading && !request) {
     return (
       <div className="flex items-center justify-center h-64">
         <LoadingSpinner />

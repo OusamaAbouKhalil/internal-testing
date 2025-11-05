@@ -142,6 +142,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
             subject: (filters as any).subject,
             student_id: (filters as any).student_id,
             tutor_id: (filters as any).tutor_id,
+            max_rating: (filters as any).max_rating,
           },
         }),
       });

@@ -37,8 +37,10 @@ import {
   BookOpen,
   Award,
   Languages,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useTutorManagementStore } from "@/stores/tutor-management-store";
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
@@ -706,6 +708,18 @@ export default function TutorsPage() {
                     </div>
                     
                     <div className="flex gap-2 flex-wrap">
+                      {/* View Button */}
+                      <Link href={`/dashboard/tutors/${tutor.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600"
+                          title="View tutor details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+
                       {/* Quick Actions */}
                       {hasPermission('tutors', 'write') && (
                         <>

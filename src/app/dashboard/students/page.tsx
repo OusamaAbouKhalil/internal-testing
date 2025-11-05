@@ -34,8 +34,10 @@ import {
   CheckCircle,
   XCircle,
   Copy,
-  Check
+  Check,
+  Eye
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useStudentManagementStore } from "@/stores/student-management-store";
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
@@ -466,13 +468,13 @@ export default function StudentsPage() {
                     className="pl-10"
                   />
                 </div>
-                <div className="relative flex-1">
-                  <Label className="text-sm font-medium">Sign-in Method</Label>
+                <div className="relative flex-1 flex items-center gap-2">
+                  <Label className="text-sm font-medium whitespace-nowrap mr-2">Sign-in Method</Label>
                   <Select
                     value={filters.sign_in_method || "all"}
                     onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
@@ -606,6 +608,18 @@ export default function StudentsPage() {
                     </div>
                     
                     <div className="flex gap-2">
+                      {/* View Button */}
+                      <Link href={`/dashboard/students/${student.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600"
+                          title="View student details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+
                       {hasPermission('students', 'write') && (
                         <>
                           {/* Verification Toggle */}

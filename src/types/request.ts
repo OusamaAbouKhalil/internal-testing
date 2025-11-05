@@ -162,7 +162,7 @@ export const getRequestTypeLabel = (type: string): string => {
     case 'thesis':
       return 'Thesis';
     case 'online':
-      return 'Online Class';
+      return 'One On One';
     case 'q&a':
       return 'Q&A';
     case 'sos':
@@ -277,6 +277,7 @@ export interface RequestFilters {
   date_to?: string;
   student_id?: string;
   tutor_id?: string;
+  max_rating?: string; // Maximum rating (e.g., "2" for 2 stars or less)
 }
 
 // Pagination Types

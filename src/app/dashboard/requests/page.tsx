@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useRequestManagementStore } from '@/stores/request-management-store';
 import { Request, RequestFilters, RequestStatus, RequestType } from '@/types/request';
 import { getRequestTypeLabel } from '@/types/request';
@@ -642,6 +642,7 @@ function getRequestStatusColor(status: string): string {
 
 export default function RequestsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const {
     requests,
     loading,
@@ -660,13 +661,29 @@ export default function RequestsPage() {
     totalItems
   } = useRequestManagementStore();
 
-  const [filters, setFilters] = useState<RequestFilters>({});
+  // Initialize filters from URL params
+  const getInitialFilters = useCallback((): RequestFilters => {
+    const initialFilters: RequestFilters = {};
+    if (searchParams.get('request_status')) {
+      initialFilters.request_status = searchParams.get('request_status') || undefined;
+    }
+    if (searchParams.get('student_id')) {
+      initialFilters.student_id = searchParams.get('student_id') || undefined;
+    }
+    if (searchParams.get('max_rating')) {
+      initialFilters.max_rating = searchParams.get('max_rating') || undefined;
+    }
+    return initialFilters;
+  }, [searchParams]);
+
+  const [filters, setFilters] = useState<RequestFilters>(getInitialFilters());
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [columnsCount, setColumnsCount] = useState(3);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const filterChangeSourceRef = useRef<'url' | 'manual'>('manual');
 
   // Create dynamic request type options from RequestType enum
   const requestTypeOptions = Object.values(RequestType).map(type => ({
@@ -674,19 +691,10 @@ export default function RequestsPage() {
     label: getRequestTypeLabel(type)
   }));
 
-  useEffect(() => {
-    // Don't trigger on initial load (empty filters)
-    if (!isInitialLoad) {
-      // Reset to page 1 and clear cache when filters change
-      setPageSize(pageSize); // This clears the cache
-      fetchRequests(filters, { page: 1, pageSize });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
-
   // Debounce search term (500ms)
   useEffect(() => {
     const t = setTimeout(() => {
+      filterChangeSourceRef.current = 'manual';
       setFilters(prev => {
         const next = { ...prev } as any;
         if (debouncedSearchTerm) {
@@ -701,15 +709,54 @@ export default function RequestsPage() {
   }, [debouncedSearchTerm]);
 
   useEffect(() => {
-    // Initial load - only run once
+    // Initial load - use filters from URL params
     if (isInitialLoad) {
-      fetchRequests({}, { page: 1, pageSize });
+      filterChangeSourceRef.current = 'url';
+      const initialFilters = getInitialFilters();
+      if (Object.keys(initialFilters).length > 0) {
+        setFilters(initialFilters);
+        fetchRequests(initialFilters, { page: 1, pageSize });
+      } else {
+        fetchRequests({}, { page: 1, pageSize });
+      }
       setIsInitialLoad(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Update filters when URL params change (but not when user manually changes filters)
+  useEffect(() => {
+    if (!isInitialLoad && filterChangeSourceRef.current !== 'manual') {
+      filterChangeSourceRef.current = 'url';
+      const urlFilters = getInitialFilters();
+      const urlFiltersStr = JSON.stringify(urlFilters);
+      const currentFiltersStr = JSON.stringify(filters);
+      if (urlFiltersStr !== currentFiltersStr) {
+        setFilters(urlFilters);
+        setSearchTerm('');
+        setDebouncedSearchTerm('');
+        fetchRequests(urlFilters, { page: 1, pageSize });
+      }
+      // Reset ref after processing URL change
+      setTimeout(() => {
+        filterChangeSourceRef.current = 'manual';
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Fetch requests when filters change (only for manual changes)
+  useEffect(() => {
+    if (!isInitialLoad && filterChangeSourceRef.current === 'manual') {
+      // Reset to page 1 and clear cache when filters change
+      setPageSize(pageSize); // This clears the cache
+      fetchRequests(filters, { page: 1, pageSize });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
   const handleFilterChange = (key: keyof RequestFilters, value: string) => {
+    filterChangeSourceRef.current = 'manual';
     setFilters(prev => {
       const newFilters = { ...prev };
       if (value) {
@@ -725,6 +772,8 @@ export default function RequestsPage() {
     setFilters({});
     setSearchTerm('');
     setDebouncedSearchTerm('');
+    // Clear URL parameters
+    router.push('/dashboard/requests');
   };
 
   const handleNextPage = () => {
@@ -864,8 +913,11 @@ export default function RequestsPage() {
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
+                key={`type-${filters.assistance_type || 'all'}`}
                 value={filters.assistance_type || 'all'}
-                onValueChange={(value) => handleFilterChange('assistance_type', value === 'all' ? '' : value)}
+                onValueChange={(value) => {
+                  handleFilterChange('assistance_type', value === 'all' ? '' : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All types" />
@@ -883,8 +935,11 @@ export default function RequestsPage() {
             <div className="space-y-2">
               <Label>Status</Label>
               <Select
+                key={`status-${filters.request_status || 'all'}`}
                 value={filters.request_status || 'all'}
-                onValueChange={(value) => handleFilterChange('request_status', value === 'all' ? '' : value)}
+                onValueChange={(value) => {
+                  handleFilterChange('request_status', value === 'all' ? '' : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
@@ -898,6 +953,28 @@ export default function RequestsPage() {
                   <SelectItem value="tutor_completed">Tutor Completed</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Rating (Stars)</Label>
+              <Select
+                key={`rating-${filters.max_rating || 'all'}`}
+                value={filters.max_rating || 'all'}
+                onValueChange={(value) => {
+                  handleFilterChange('max_rating', value === 'all' ? '' : value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All ratings" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ratings</SelectItem>
+                  <SelectItem value="1">1 star or less</SelectItem>
+                  <SelectItem value="2">2 stars or less</SelectItem>
+                  <SelectItem value="3">3 stars or less</SelectItem>
+                  <SelectItem value="4">4 stars or less</SelectItem>
+                  <SelectItem value="5">5 stars or less</SelectItem>
                 </SelectContent>
               </Select>
             </div>

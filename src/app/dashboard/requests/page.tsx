@@ -369,8 +369,10 @@ function RequestCard({ request }: { request: Request }) {
           )}
 
           <div className="flex justify-between text-sm gap-2">
-            <span className="text-muted-foreground flex-shrink-0">Exam Type:</span>
-            <span className="font-medium text-right ">{request.exam_type || 'N/A'}</span>
+            <span className="text-muted-foreground flex-shrink-0">Type:</span>
+            <span className="font-medium text-right ">
+              {(request.exam_type && request.exam_type.toLowerCase() === 'sos') ? 'Q&A' : (request.exam_type || 'N/A')}
+            </span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Subject:</span>

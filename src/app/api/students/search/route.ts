@@ -47,6 +47,7 @@ export async function POST(request: Request) {
     if (f.deleted === true) {
       filtersParts.push(`is_deleted:1`);
     }
+    
     if (f.sign_in_method) {
       if (f.sign_in_method === 'manual') {
         filtersParts.push(`has_google_id=-1 AND has_facebook_id=-1 AND has_apple_id=-1`);

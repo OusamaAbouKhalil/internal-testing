@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
     if (f.sign_in_method) {
       if (f.sign_in_method === 'manual') {
-        filtersParts.push(`has_google_id=0 AND has_facebook_id=0 AND has_apple_id=0`);
+        filtersParts.push(`has_google_id=-1 AND has_facebook_id=-1 AND has_apple_id=-1`);
       } else if (f.sign_in_method === 'google') {
         filtersParts.push(`has_google_id=1`);
       } else if (f.sign_in_method === 'facebook') {

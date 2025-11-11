@@ -397,6 +397,11 @@ export default function StudentsPage() {
               ) : (
                 <>Total: {totalCount} student{totalCount !== 1 ? 's' : ''}</>
               )}
+              {(filters.created_at_from || filters.created_at_to) && (
+                <span className="ml-2 text-green-600 font-medium">
+                  • {totalCount} student{totalCount !== 1 ? 's' : ''} in date range
+                </span>
+              )}
             </p>
           </div>
           <div className="flex space-x-2">
@@ -410,7 +415,7 @@ export default function StudentsPage() {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Filters</CardTitle>
-              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || Object.keys(filters).length > 0 || activeTab !== 'all') && (
+              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || filters.created_at_from || filters.created_at_to || Object.keys(filters).length > 0 || activeTab !== 'all') && (
                 <Button variant="outline" size="sm" onClick={handleClearFilters}>
                   Clear Filters
                 </Button>
@@ -485,6 +490,30 @@ export default function StudentsPage() {
                       <SelectItem value="apple">Apple</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              
+              {/* Date Range Filters */}
+              <div className="flex flex-col md:flex-row md:items-center gap-2 pt-2 border-t">
+                <div className="flex items-center gap-2 flex-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium whitespace-nowrap">Created From:</Label>
+                  <Input
+                    type="date"
+                    value={filters.created_at_from || ''}
+                    onChange={(e) => setFilters({ ...filters, created_at_from: e.target.value || undefined })}
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium whitespace-nowrap">Created To:</Label>
+                  <Input
+                    type="date"
+                    value={filters.created_at_to || ''}
+                    onChange={(e) => setFilters({ ...filters, created_at_to: e.target.value || undefined })}
+                    className="flex-1"
+                  />
                 </div>
               </div>
             </div>

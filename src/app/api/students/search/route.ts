@@ -16,6 +16,8 @@ type SearchBody = {
     country?: string;
     nationality?: string;
     gender?: string;
+    created_at_from?: string; // Filter by created_at from date (ISO string or YYYY-MM-DD)
+    created_at_to?: string; // Filter by created_at to date (ISO string or YYYY-MM-DD)
   };
 };
 
@@ -68,6 +70,34 @@ export async function POST(request: Request) {
     if (f.gender) {
       filtersParts.push(`gender:"${f.gender}"`);
     }
+    
+    // Filter by created_at date range (from/to dates)
+    if (f.created_at_from || f.created_at_to) {
+      let fromTimestamp: number | null = null;
+      let toTimestamp: number | null = null;
+      
+      if (f.created_at_from) {
+        const fromDate = new Date(f.created_at_from);
+        fromDate.setHours(0, 0, 0, 0);
+        fromTimestamp = fromDate.getTime();
+      }
+      
+      if (f.created_at_to) {
+        const toDate = new Date(f.created_at_to);
+        toDate.setHours(23, 59, 59, 999);
+        toTimestamp = toDate.getTime();
+      }
+      
+      // Build the date range filter
+      if (fromTimestamp !== null && toTimestamp !== null) {
+        filtersParts.push(`created_at >= ${fromTimestamp} AND created_at <= ${toTimestamp}`);
+      } else if (fromTimestamp !== null) {
+        filtersParts.push(`created_at >= ${fromTimestamp}`);
+      } else if (toTimestamp !== null) {
+        filtersParts.push(`created_at <= ${toTimestamp}`);
+      }
+    }
+    
     const filtersString = filtersParts.join(' AND ');
     console.log('filtersString:', filtersString);
     const client = getAlgoliaClient();

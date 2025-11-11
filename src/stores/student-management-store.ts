@@ -170,6 +170,8 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
               country: (filters as any).country,
               nationality: (filters as any).nationality,
               gender: (filters as any).gender,
+              created_at_from: (filters as any).created_at_from,
+              created_at_to: (filters as any).created_at_to,
             },
           }),
         });

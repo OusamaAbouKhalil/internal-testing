@@ -162,6 +162,8 @@ export interface StudentFilters {
   sign_in_method?: 'manual' | 'facebook' | 'google' | 'apple';
   min_spend?: number;
   max_spend?: number;
+  created_at_from?: string; // Filter by created_at from date (ISO string or YYYY-MM-DD)
+  created_at_to?: string; // Filter by created_at to date (ISO string or YYYY-MM-DD)
   page?: number;
   limit?: number;
 }

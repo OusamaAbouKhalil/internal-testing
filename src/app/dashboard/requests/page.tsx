@@ -24,6 +24,7 @@ import { StatusManagement } from '@/components/status-management';
 import { AssignmentManagement } from '@/components/assignment-management';
 import { TutorOffersManagement } from '@/components/tutor-offers-management';
 import { combineDateAndTime, formatDate as formatDateUtil, formatDateWithTimezone } from '@/lib/date-utils';
+import { getEffectiveStudentPrice } from '@/lib/pricing-utils';
 import { 
   Plus, 
   Search, 
@@ -396,12 +397,25 @@ function RequestCard({ request }: { request: Request }) {
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               {/* Show Student Price only if user has 'requests:request_student_price' permission */}
-              {hasPermission('requests', 'request_student_price') ? (
-                <>
-                  <span className="text-muted-foreground">Student Price:</span>
-                  <div className="font-semibold text-green-600">${request.student_price}</div>
-                </>
-              ) : (
+              {hasPermission('requests', 'request_student_price') ? (() => {
+                const effectivePrice = getEffectiveStudentPrice({
+                  student_price: request.student_price,
+                  tutor_price: request.tutor_price,
+                  country: request.country,
+                  min_price: request.min_price
+                });
+                return (
+                  <>
+                    <span className="text-muted-foreground">Student Price:</span>
+                    <div className="font-semibold text-green-600">
+                      ${effectivePrice.price}
+                      {effectivePrice.isOverride && (
+                        <span className="ml-1 text-xs text-muted-foreground">(override)</span>
+                      )}
+                    </div>
+                  </>
+                );
+              })() : (
                 <>
                   <span className="text-muted-foreground">Student Price:</span>
                   <div className="font-semibold text-green-600">Hidden</div>
@@ -413,7 +427,7 @@ function RequestCard({ request }: { request: Request }) {
               {hasPermission('requests', 'request_tutor_price') ? (
                 <>
                   <span className="text-muted-foreground">Tutor Price:</span>
-                  <div className="font-semibold text-blue-600">${request.tutor_price}</div>
+                  <div className="font-semibold text-blue-600">${request.tutor_price || '0'}</div>
                 </>
               ) : (
                 <>
@@ -484,22 +498,12 @@ function RequestActions({ request }: { request: Request }) {
     }
   };
 
-  const handleAssignTutor = async (tutorId: string, tutorPrice: string) => {
+  const handleAssignTutor = async (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => {
     try {
-      await assignTutor(request.id, tutorId, tutorPrice);
+      await assignTutor(request.id, tutorId, tutorPrice, studentPrice, minPrice);
       setIsOpen(false);
     } catch (error) {
       console.error('Error assigning tutor:', error);
-    }
-  };
-
-  const handleSetPrices = async (tutorPrice?: string, studentPrice?: string) => {
-    try {
-      await setTutorPrice(request.id, tutorPrice ? tutorPrice : '');
-      await setStudentPrice(request.id, studentPrice ? studentPrice : '');
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error setting prices:', error);
     }
   };
 
@@ -580,7 +584,6 @@ function RequestActions({ request }: { request: Request }) {
             <AssignmentManagement 
               request={request}
               onAssignTutor={handleAssignTutor}
-              onSetPrices={handleSetPrices}
               loading={loading}
             />
           </TabsContent>

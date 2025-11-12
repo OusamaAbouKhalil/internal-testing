@@ -71,7 +71,8 @@ export interface TutorOffer {
   id: string;
   cancel_reason: string | null;
   created_at: string | { _seconds: number; _nanoseconds: number };
-  price: string; // numeric stored as text
+  price: string; // numeric stored as text - calculated price (tutor_price × multiplier)
+  tutor_price: string; // numeric stored as text - what tutor will receive
   request_id: string;
   status: string;
   tutor_id: string;

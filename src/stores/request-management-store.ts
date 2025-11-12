@@ -5,6 +5,7 @@ import {
   doc, 
   getDoc, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc,
   query,
@@ -16,6 +17,7 @@ import {
   QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { fetchWithProgress } from '@/lib/api-progress';
+import { calculateStudentPrice, calculateTutorOfferPrice } from '@/lib/pricing-utils';
 import { db } from '@/config/firebase';
 import { 
   Request, 
@@ -59,7 +61,7 @@ interface RequestManagementStore {
   
   // Request Management Actions
   changeRequestStatus: (requestId: string, status: string, reason?: string) => Promise<void>;
-  assignTutor: (requestId: string, tutorId: string, tutorPrice: string) => Promise<void>;
+  assignTutor: (requestId: string, tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => Promise<void>;
   assignStudent: (requestId: string, studentId: string, studentPrice: string) => Promise<void>;
   setTutorPrice: (requestId: string, tutorPrice: string) => Promise<void>;
   setStudentPrice: (requestId: string, studentPrice: string) => Promise<void>;
@@ -430,19 +432,28 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     }
   },
 
-  assignTutor: async (requestId, tutorId, tutorPrice) => {
+  assignTutor: async (requestId, tutorId, tutorPrice, studentPrice?, minPrice?) => {
     try {
       set({ loading: true, error: null });
       
-      const updateData = {
-        tutor_id: tutorId,
-        tutor_price: tutorPrice,
-        tutor_accepted: '1',
-        request_status: 'ONGOING',
-        updated_at: new Date().toISOString()
-      };
+      const response = await fetch(`/api/requests/${requestId}/actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'assign_tutor',
+          tutorId,
+          tutorPrice,
+          studentPrice,
+          minPrice
+        }),
+      });
       
-      await updateDoc(doc(db, 'requests', requestId), updateData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to assign tutor');
+      }
       
       set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
@@ -667,15 +678,28 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     }
   },
 
-  createTutorOffer: async (requestId, tutorId, price) => {
+  createTutorOffer: async (requestId, tutorId, tutorPrice) => {
     try {
       set({ loading: true, error: null });
+      
+      // Get request to get country for price calculation
+      const requestDoc = await getDoc(doc(db, 'requests', requestId));
+      if (!requestDoc.exists()) {
+        throw new Error('Request not found');
+      }
+      
+      const requestData = requestDoc.data();
+      const country = requestData?.country || null;
+      
+      // Calculate price (tutor_price × multiplier)
+      const calculatedPrice = calculateTutorOfferPrice(tutorPrice, country);
       
       const now = new Date().toISOString();
       
       const newOffer = {
         tutor_id: tutorId,
-        price: price,
+        tutor_price: tutorPrice, // What tutor will receive
+        price: calculatedPrice, // Calculated price (tutor_price × multiplier)
         request_id: requestId,
         status: 'pending',
         cancel_reason: null,
@@ -683,7 +707,24 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         updated_at: now
       };
       
-      await addDoc(collection(db, 'requests', requestId, 'tutor_offers'), newOffer);
+      // Use tutor_id as the document ID (not auto-generated)
+      const tutorOfferRef = doc(db, 'requests', requestId, 'tutor_offers', tutorId);
+      
+      // Check if offer already exists
+      const existingOffer = await getDoc(tutorOfferRef);
+      
+      if (existingOffer.exists()) {
+        // Update existing offer
+        await updateDoc(tutorOfferRef, {
+          tutor_price: tutorPrice,
+          price: calculatedPrice,
+          status: 'pending',
+          updated_at: now
+        });
+      } else {
+        // Create new offer with tutor_id as document ID
+        await setDoc(tutorOfferRef, newOffer);
+      }
       
       set({ loading: false });
       get().fetchTutorOffers(requestId); // Refresh offers
@@ -746,26 +787,79 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     try {
       set({ loading: true, error: null });
       
+      // Get the offer to get tutor info (offerId is actually tutor_id since it's the document ID)
+      const offerDoc = await getDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId));
+      if (!offerDoc.exists()) {
+        throw new Error('Offer not found');
+      }
+      
+      const offerData = offerDoc.data();
+      if (!offerData) {
+        throw new Error('Offer data not found');
+      }
+      
+      // Get request document to access country and min_price for price calculation
+      const requestDoc = await getDoc(doc(db, 'requests', requestId));
+      if (!requestDoc.exists()) {
+        throw new Error('Request not found');
+      }
+      
+      const requestData = requestDoc.data();
+      const country = requestData?.country || null;
+      const minPrice = requestData?.min_price || null;
+      const currentStudentPrice = requestData?.student_price || null;
+      
+      // Use tutor_price from offer (what tutor will receive)
+      const tutorPrice = offerData.tutor_price || offerData.price; // Fallback to price for legacy offers
+      
+      // Calculate student_price based on pricing priority rules
+      const calculatedStudentPrice = calculateStudentPrice({
+        student_price: currentStudentPrice, // Keep override if exists
+        tutor_price: tutorPrice,
+        country: country,
+        min_price: minPrice
+      });
+      
       // Update the offer status
       await updateDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId), {
         status: 'accepted',
         updated_at: new Date().toISOString()
       });
       
-      // Get the offer to get tutor info
-      const offerDoc = await getDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId));
-      const offerData = offerDoc.data();
+      // Update the request with tutor assignment
+      const updateData: any = {
+        tutor_id: offerData.tutor_id,
+        tutor_price: tutorPrice,
+        tutor_accepted: '1',
+        request_status: 'pending_payment',
+        accepted: '1',
+        updated_at: new Date().toISOString()
+      };
       
-      if (offerData) {
-        // Update the request with tutor assignment
-        await updateDoc(doc(db, 'requests', requestId), {
-          tutor_id: offerData.tutor_id,
-          tutor_price: offerData.price,
-          tutor_accepted: '1',
-          request_status: 'ONGOING',
-          updated_at: new Date().toISOString()
-        });
+      // Only update student_price if it's not already an override
+      if (!currentStudentPrice || currentStudentPrice === '0' || currentStudentPrice === '') {
+        updateData.student_price = calculatedStudentPrice;
       }
+      
+      await updateDoc(doc(db, 'requests', requestId), updateData);
+      
+      // Reject other pending offers
+      const otherOffersQuery = query(
+        collection(db, 'requests', requestId, 'tutor_offers'),
+        where('tutor_id', '!=', offerData.tutor_id),
+        where('status', '==', 'pending')
+      );
+      const otherOffersSnapshot = await getDocs(otherOffersQuery);
+      
+      const rejectPromises = otherOffersSnapshot.docs.map(doc =>
+        updateDoc(doc.ref, {
+          status: 'rejected',
+          cancel_reason: 'Another tutor was selected',
+          updated_at: new Date().toISOString()
+        })
+      );
+      
+      await Promise.all(rejectPromises);
       
       set({ loading: false });
       get().fetchTutorOffers(requestId); // Refresh offers

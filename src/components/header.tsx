@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Bell } from 'lucide-react';
@@ -15,6 +15,24 @@ export function Header() {
   
   // Setup realtime listener
   useRealtimeNotifications();
+  
+  // Request notification permission on mount (if not already granted)
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Request permission after a short delay to ensure user interaction context
+      const timer = setTimeout(() => {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            console.log('✅ Notification permission granted');
+          } else {
+            console.log('⚠️ Notification permission denied');
+          }
+        });
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   return (
     <>

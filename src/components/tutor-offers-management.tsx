@@ -140,8 +140,13 @@ export function TutorOffersManagement({
                       ) : (
                         <div className="font-medium">Tutor ID: {offer.tutor_id}</div>
                       )}
-                      <div className="text-sm text-muted-foreground mt-1">Price: ${offer.price}</div>
-                      <Badge className={getRequestStatusColor(offer.status)}>
+                      <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                        {offer.tutor_price && (
+                          <div>Tutor receives: <span className="font-semibold text-blue-600">${offer.tutor_price}</span></div>
+                        )}
+                        <div>Student price: <span className="font-semibold text-green-600">${offer.price || '0'}</span></div>
+                      </div>
+                      <Badge className={`mt-2 ${getRequestStatusColor(offer.status)}`}>
                         {offer.status}
                       </Badge>
                     </div>

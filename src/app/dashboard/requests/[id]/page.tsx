@@ -184,28 +184,15 @@ export default function RequestDetailPage() {
     }
   };
 
-  const handleAssignTutor = async (tutorId: string, tutorPrice: string) => {
+  const handleAssignTutor = async (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => {
     if (!request) return;
     
     try {
-      await assignTutor(request.id, tutorId, tutorPrice);
+      await assignTutor(request.id, tutorId, tutorPrice, studentPrice, minPrice);
       // Refresh only this specific request
       await refreshRequest();
     } catch (error) {
       console.error('Error assigning tutor:', error);
-    }
-  };
-
-  const handleSetPrices = async (tutorPrice?: string, studentPrice?: string) => {
-    if (!request) return;
-    
-    try {
-      await setTutorPrice(request.id, tutorPrice ? tutorPrice : '');
-      await setStudentPrice(request.id, studentPrice ? studentPrice : '');
-      // Refresh only this specific request
-      await refreshRequest();
-    } catch (error) {
-      console.error('Error setting prices:', error);
     }
   };
 
@@ -364,7 +351,6 @@ export default function RequestDetailPage() {
               <AssignmentManagement 
                 request={request}
                 onAssignTutor={handleAssignTutor}
-                onSetPrices={handleSetPrices}
                 loading={loading}
               />
             </TabsContent>

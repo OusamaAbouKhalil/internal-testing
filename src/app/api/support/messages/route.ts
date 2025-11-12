@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * API Route for sending messages
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
       room_id,
       message,
       message_type = 'text',
-      url
+      url = null
     } = body;
 
     if (!sender_id || !user_type || !room_id || !message) {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get room data
-    const roomDoc = await adminDb.collection('customer_support_rooms').doc(room_id).get();
+    const roomDoc = await adminDb.collection('support_rooms').doc(room_id).get();
     
     if (!roomDoc.exists) {
       return NextResponse.json(
@@ -68,23 +69,23 @@ export async function POST(request: NextRequest) {
     const messageData = {
       sender_id,
       user_type,
-      room_id,
-      message: message_type === 'text' ? message : url,
+      message: message_type === 'text' ? message : (url || message || ''),
       message_type,
-      seen: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      file_name: message_type !== 'text' ? url : null,
+      seen: false,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp()
     };
 
-    const messageRef = await adminDb.collection('customer_support_chats').add(messageData);
-    const message = { id: messageRef.id, ...messageData };
+    const messageRef = await adminDb.collection('support_rooms').doc(room_id).collection('messages').add(messageData);
+    const savedMessage = { id: messageRef.id, ...messageData };
 
     // Handle Firebase notifications (simplified - you may need to implement actual Firebase messaging)
     if (user_type !== 'admin') {
       // Send notification to admin users
       console.log('📱 Sending notification to admin users:', {
-        title: user_type === 'student' ? student?.nickname : tutor?.nickname,
-        body: message.message,
+        title: user_type === 'student' ? (student as any)?.nickname : (tutor as any)?.nickname,
+        body: savedMessage.message,
         room_id,
         sender_id,
         user_type,
@@ -94,28 +95,28 @@ export async function POST(request: NextRequest) {
       // Send email notification (simplified)
       if (student) {
         console.log('📧 Sending email notification:', {
-          name: student.full_name,
-          email: student.email,
-          phone: student.phone_number,
-          message: message_type === 'file' ? 'File' : message.message
+          name: (student as any).full_name,
+          email: (student as any).email,
+          phone: (student as any).phone_number,
+          message: message_type === 'file' ? 'File' : savedMessage.message
         });
       }
     } else {
       // Send notification to student/tutor
       const targetUser = roomData?.user_type === 'student' ? student : tutor;
-      if (targetUser?.device_token) {
+      if ((targetUser as any)?.device_token) {
         console.log('📱 Sending notification to user:', {
           title: 'Customer Support',
-          body: message.message,
-          device_token: targetUser.device_token,
-          platform: targetUser.platform
+          body: savedMessage.message,
+          device_token: (targetUser as any).device_token,
+          platform: (targetUser as any).platform
         });
       }
     }
 
     return NextResponse.json({
       success: true,
-      message
+      message: savedMessage
     }, { status: 201 });
 
   } catch (error) {

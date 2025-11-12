@@ -37,7 +37,7 @@ export function AuthGuard({ children, requiredPermission, requiredRole }: AuthGu
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-500">Checking authentication...</p>
+          <p className="text-muted-foreground">Checking authentication...</p>
         </div>
       </div>
     );
@@ -54,11 +54,11 @@ export function AuthGuard({ children, requiredPermission, requiredRole }: AuthGu
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-4">
             You don't have permission to access this resource.
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Required: {requiredPermission.resource}:{requiredPermission.action}
           </p>
         </div>
@@ -72,11 +72,11 @@ export function AuthGuard({ children, requiredPermission, requiredRole }: AuthGu
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Access Denied</h2>
+          <p className="text-muted-foreground mb-4">
             You don't have the required role to access this resource.
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Required role: {requiredRole}
           </p>
         </div>

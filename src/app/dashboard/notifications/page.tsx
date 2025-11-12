@@ -194,7 +194,7 @@ export default function NotificationsPage() {
       render: (value, row) => {
         const date = new Date(value as string);
         return (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-muted-foreground">
             {date.toLocaleDateString()} {date.toLocaleTimeString()}
           </div>
         );

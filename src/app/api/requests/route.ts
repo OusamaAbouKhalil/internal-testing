@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('student_id')) filters.student_id = searchParams.get('student_id')!;
     if (searchParams.get('tutor_id')) filters.tutor_id = searchParams.get('tutor_id')!;
 
+    // Parse pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+    const lastVisibleId = searchParams.get('lastVisibleId');
+
     let query = adminDb.collection('requests').orderBy('created_at', 'desc');
 
     // Apply Firestore filters
@@ -46,8 +51,25 @@ export async function GET(request: NextRequest) {
       query = query.where('tutor_id', '==', filters.tutor_id);
     }
 
+    // Apply pagination cursor if provided
+    if (lastVisibleId) {
+      const lastDoc = await adminDb.collection('requests').doc(lastVisibleId).get();
+      if (lastDoc.exists) {
+        query = query.startAfter(lastDoc);
+      }
+    }
+
+    // Fetch one extra to check if there's a next page
+    query = query.limit(pageSize + 1);
+
     const snapshot = await query.get();
-    const requests = snapshot.docs.map((doc: any) => ({
+    const docs = snapshot.docs;
+    
+    // Check if there's more data
+    const hasNextPage = docs.length > pageSize;
+    const requestDocs = hasNextPage ? docs.slice(0, pageSize) : docs;
+
+    const requests = requestDocs.map((doc: any) => ({
       id: doc.id,
       ...doc.data()
     }));
@@ -77,7 +99,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ requests: filteredRequests });
+    return NextResponse.json({ 
+      requests: filteredRequests,
+      pagination: {
+        currentPage: page,
+        pageSize: pageSize,
+        hasNextPage: hasNextPage,
+        hasPreviousPage: page > 1,
+        lastVisibleId: requestDocs.length > 0 ? requestDocs[requestDocs.length - 1].id : null
+      }
+    });
   } catch (error: any) {
     console.error('Error fetching requests:', error);
     return NextResponse.json(

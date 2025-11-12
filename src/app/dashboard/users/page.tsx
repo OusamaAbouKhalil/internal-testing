@@ -86,8 +86,8 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-            <p className="text-gray-600 mt-2">Manage user accounts and permissions</p>
+          <h1 className="text-3xl font-bold text-foreground">Users</h1>
+            <p className="text-muted-foreground mt-2">Manage user accounts and permissions</p>
         </div>
           <div className="flex space-x-2">
             <Button variant="outline" className="flex items-center gap-2">
@@ -109,7 +109,7 @@ export default function UsersPage() {
         {/* Search Bar */}
         <div className="flex items-center space-x-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search users..."
               value={searchTerm}
@@ -220,9 +220,9 @@ export default function UsersPage() {
           <Card>
             <CardContent className="p-6">
               <div className="text-center">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-                <p className="text-gray-500 mb-4">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No users found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm ? 'No users match your search criteria.' : 'Users will appear here once they are added to the system.'}
                 </p>
                 {hasPermission('users', 'write') && !searchTerm && (

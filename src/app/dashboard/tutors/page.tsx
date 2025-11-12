@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingOverlay, LoadingButton } from "@/components/ui/loading-spinner";
 import { StatusBadge, NotificationBadge } from "@/components/ui/status-badge";
 import { EnhancedTutorDialog } from "@/components/enhanced-tutor-dialog";
+import { PaginationAdvanced } from "@/components/pagination.advanced";
 import { 
   GraduationCap, 
   Plus, 
@@ -35,8 +36,11 @@ import {
   Ban,
   BookOpen,
   Award,
-  Languages
+  Languages,
+  RotateCcw,
+  Eye
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useTutorManagementStore } from "@/stores/tutor-management-store";
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
@@ -49,12 +53,20 @@ import { getImageUrl } from "@/lib/file-upload";
 
 export default function TutorsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [emailTerm, setEmailTerm] = useState("");
+  const [nicknameTerm, setNicknameTerm] = useState("");
+  const [phoneTerm, setPhoneTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [debouncedEmailTerm, setDebouncedEmailTerm] = useState("");
+  const [debouncedNicknameTerm, setDebouncedNicknameTerm] = useState("");
+  const [debouncedPhoneTerm, setDebouncedPhoneTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<TutorFilters>({});
+  const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'not_verified' | 'deleted' | 'cancelled'>('all');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState({
@@ -67,16 +79,22 @@ export default function TutorsPage() {
     loading, 
     error, 
     totalCount,
+    totalPages,
     hasMore,
+    currentPage,
+    perPage,
     fetchTutors, 
     createTutor, 
     updateTutor, 
     deleteTutor,
+    restoreTutor,
     importTutors,
     resetPagination,
     toggleVerification,
     toggleNotifications,
-    toggleCancelled
+    toggleCancelled,
+    setCurrentPage,
+    setPerPage
   } = useTutorManagementStore();
 
   const { hasPermission } = useFirebaseAuthStore();
@@ -108,29 +126,156 @@ export default function TutorsPage() {
     }
   }, [tutors]);
 
-  useEffect(() => {
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+    setCurrentPage(newPage);
+    fetchTutors(filters, newPage);
+  };
+
+  // Handle per page change
+  const handlePerPageChange = (newPerPage: number) => {
+    setPerPage(newPerPage);
     const searchFilters: TutorFilters = {
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
       ...filters
     };
     resetPagination();
-    fetchTutors(searchFilters);
-  }, [searchTerm, filters, resetPagination, fetchTutors]);
+    fetchTutors(searchFilters, 1, 'first');
+  };
+
+  // Debounce search term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Debounce email term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmailTerm(emailTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [emailTerm]);
+
+  // Debounce nickname term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNicknameTerm(nicknameTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [nicknameTerm]);
+
+  // Debounce phone term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneTerm(phoneTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [phoneTerm]);
+
+  useEffect(() => {
+    const searchFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters
+    };
+    resetPagination();
+    fetchTutors(searchFilters, 1, 'first');
+  }, [debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, filters]);
+
+  const handleTabChange = (tab: 'all' | 'verified' | 'not_verified' | 'deleted' | 'cancelled') => {
+    setActiveTab(tab);
+    // Reset related filters, then set tab-specific ones
+    const base = { ...filters, verified: undefined, deleted: undefined, cancelled: undefined } as TutorFilters;
+    if (tab === 'verified') setFilters({ ...base, verified: true });
+    else if (tab === 'not_verified') setFilters({ ...base, verified: false });
+    else if (tab === 'deleted') setFilters({ ...base, deleted: true });
+    else if (tab === 'cancelled') setFilters({ ...base, cancelled: true });
+    else setFilters(base);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
+    setEmailTerm('');
+    setNicknameTerm('');
+    setPhoneTerm('');
+    setDebouncedSearchTerm('');
+    setDebouncedEmailTerm('');
+    setDebouncedNicknameTerm('');
+    setDebouncedPhoneTerm('');
+    setActiveTab('all');
+  };
 
   const handleCreateTutor = useCallback(async (tutorData: any) => {
     await createTutor(tutorData);
-  }, [createTutor]);
+    const currentFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchTutors(currentFilters, currentPage);
+  }, [createTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleUpdateTutor = useCallback(async (tutorData: any) => {
     if (!selectedTutor) return;
     await updateTutor(selectedTutor.id, tutorData);
-  }, [selectedTutor, updateTutor]);
+    const currentFilters: TutorFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchTutors(currentFilters, currentPage);
+  }, [selectedTutor, updateTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleDeleteTutor = useCallback(async (tutorId: string) => {
     if (confirm('Are you sure you want to delete this tutor?')) {
       await deleteTutor(tutorId);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     }
-  }, [deleteTutor]);
+  }, [deleteTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
+
+  const handleRestoreTutor = useCallback(async (tutorId: string) => {
+    try {
+      setActionLoading(tutorId + '_restore');
+      await restoreTutor(tutorId);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
+    } catch (error: any) {
+      alert(`Failed to restore tutor: ${error.message || 'Unknown error'}`);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [restoreTutor, fetchTutors, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const openCreateDialog = useCallback(() => {
     setDialogMode('create');
@@ -144,9 +289,6 @@ export default function TutorsPage() {
     setIsEditDialogOpen(true);
   }, []);
 
-  const handleLoadMore = () => {
-    fetchTutors(filters, true);
-  };
 
   const handleImportTutors = async () => {
     try {
@@ -165,6 +307,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_verify');
       const newStatus = currentStatus === '2' ? false : true;
       await toggleVerification(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle verification:', error);
     } finally {
@@ -177,6 +327,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_notif');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleNotifications(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle notifications:', error);
     } finally {
@@ -189,6 +347,14 @@ export default function TutorsPage() {
       setActionLoading(tutorId + '_cancel');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleCancelled(tutorId, newStatus);
+      const currentFilters: TutorFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchTutors(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle cancelled status:', error);
     } finally {
@@ -230,29 +396,78 @@ export default function TutorsPage() {
     return '👤';
   };
 
-  const getSignInMethodIcon = (signInMethod?: string) => {
-    switch (signInMethod) {
-      case 'facebook':
-        return <User className="h-4 w-4 text-blue-600" />;
-      case 'google':
-        return <Globe className="h-4 w-4 text-red-500" />;
-      case 'apple':
-        return <Apple className="h-4 w-4 text-gray-800" />;
-      default:
-        return <User className="h-4 w-4 text-gray-600" />;
+  const formatDate = (value: any): string => {
+    if (value === undefined || value === null) return 'Not set';
+    
+    // If it's already a string that's not a valid date format, return it as-is
+    if (typeof value === 'string' && value.trim() !== '') {
+      const trimmed = value.trim();
+      // If it's not a numeric or date-like string, return it as-is
+      if (!/^\d/.test(trimmed) && !trimmed.includes('-') && !trimmed.includes('/')) {
+        return trimmed;
+      }
     }
-  };
+    
+    try {
+      let date: Date | null = null;
 
-  const getSignInMethodLabel = (signInMethod?: string) => {
-    switch (signInMethod) {
-      case 'facebook':
-        return 'Facebook';
-      case 'google':
-        return 'Google';
-      case 'apple':
-        return 'Apple';
-      default:
-        return 'Manual';
+      // Firestore Timestamp instance with toDate()
+      if (value && typeof value.toDate === 'function') {
+        date = value.toDate();
+      }
+      // Firestore-like object with seconds/_seconds and optional nanoseconds
+      else if (value && typeof value === 'object' && (
+          ('seconds' in value) || ('_seconds' in value)
+        )) {
+        const seconds = (value.seconds ?? value._seconds) as number;
+        const nanos = (value.nanoseconds ?? value._nanoseconds ?? 0) as number;
+        if (typeof seconds === 'number') {
+          date = new Date(seconds * 1000 + Math.floor(nanos / 1e6));
+        }
+      }
+      // Native Date
+      else if (value instanceof Date) {
+        date = value;
+      }
+      // Numeric epoch (ms or seconds)
+      else if (typeof value === 'number') {
+        // Heuristic: < 1e12 => seconds, else milliseconds
+        const ms = value < 1e12 ? value * 1000 : value;
+        date = new Date(ms);
+      }
+      // String input (ISO, RFC, or numeric string)
+      else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '') return 'Not set';
+        // If purely numeric (or numeric with decimal), treat as epoch
+        if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmed)) {
+          const num = parseFloat(trimmed);
+          const ms = num < 1e12 ? num * 1000 : num;
+          date = new Date(ms);
+        } else {
+          date = new Date(trimmed);
+        }
+      }
+
+      if (!date || isNaN(date.getTime())) {
+        // If date parsing failed and it's a string, return the string as-is
+        if (typeof value === 'string') {
+          return value;
+        }
+        return 'Invalid date';
+      }
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      // If parsing fails and it's a string, return the string as-is
+      if (typeof value === 'string') {
+        return value;
+      }
+      return 'Invalid date';
     }
   };
 
@@ -262,9 +477,15 @@ export default function TutorsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Tutors</h1>
-            <p className="text-gray-600 mt-2">Manage tutor accounts and information</p>
-            <p className="text-sm text-gray-500 mt-1">Total: {totalCount} tutors</p>
+            <h1 className="text-3xl font-bold">Tutors</h1>
+            <p className="text-muted-foreground mt-2">Manage tutor accounts and information</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tutors.length > 0 ? (
+                <>Showing {tutors.length} of {totalCount} tutor{totalCount !== 1 ? 's' : ''}</>
+              ) : (
+                <>Total: {totalCount} tutor{totalCount !== 1 ? 's' : ''}</>
+              )}
+            </p>
           </div>
           <div className="flex space-x-2">
             <Button 
@@ -293,7 +514,7 @@ export default function TutorsPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         This will import all tutors from the tutors.json file.
                       </p>
                       <div className="flex justify-end space-x-2">
@@ -321,106 +542,102 @@ export default function TutorsPage() {
         </div>
 
         {/* Search and Filters */}
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search by name, email, phone, WhatsApp, country, bio, etc..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Filters</CardTitle>
+              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || Object.keys(filters).length > 0 || activeTab !== 'all') && (
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              )}
             </div>
-            <Button variant="outline" onClick={() => setShowFilters((v) => !v)} className="whitespace-nowrap">
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
-          </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Status Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'verified', label: 'Verified' },
+                  { key: 'not_verified', label: 'Not Verified' },
+                  { key: 'deleted', label: 'Deleted' },
+                  { key: 'cancelled', label: 'Cancelled' },
+                ].map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTabChange(tab.key as any)}
+                    className="whitespace-nowrap"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-          {showFilters && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Filters</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Verification Status</Label>
-                    <Select
-                      value={filters.verified?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, verified: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="true">Verified</SelectItem>
-                        <SelectItem value="false">Not Verified</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Country</Label>
-                    <Select
-                      value={filters.country || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, country: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Countries" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Countries</SelectItem>
-                        {Array.from(filterOptions.countries).sort((a, b) => a.localeCompare(b)).map((country) => (
-                          <SelectItem key={country} value={country}>
-                            {country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label>Has Requests</Label>
-                    <Select
-                      value={filters.has_requests?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, has_requests: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">With Requests</SelectItem>
-                        <SelectItem value="false">No Requests</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Sign-in Method</Label>
-                    <Select
-                      value={filters.sign_in_method || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="apple">Apple</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by name, country, etc..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by email..."
+                    value={emailTerm}
+                    onChange={(e) => setEmailTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by phone..."
+                    value={phoneTerm}
+                    onChange={(e) => setPhoneTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {tutors.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
+          </div>
+        )}
 
         {/* Error Alert */}
         {error && (
@@ -464,12 +681,12 @@ export default function TutorsPage() {
                             {tutor.full_name || 'No Name'}
                           </CardTitle>
                           {tutor.nickname && tutor.nickname !== tutor.full_name && (
-                            <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                               <UserCircle className="h-3 w-3" />
                               @{tutor.nickname}
                             </p>
                           )}
-                          <CardDescription className="flex items-center gap-4 mt-1">
+                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Mail className="h-4 w-4" />
                               {tutor.email}
@@ -491,6 +708,18 @@ export default function TutorsPage() {
                     </div>
                     
                     <div className="flex gap-2 flex-wrap">
+                      {/* View Button */}
+                      <Link href={`/dashboard/tutors/${tutor.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600"
+                          title="View tutor details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+
                       {/* Quick Actions */}
                       {hasPermission('tutors', 'write') && (
                         <>
@@ -503,7 +732,7 @@ export default function TutorsPage() {
                             className={
                               tutor.verified === '2'
                                 ? "hover:bg-green-50 hover:border-green-200 text-green-600 border-green-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.verified === '2' ? 'Unverify tutor' : 'Verify tutor'}
                           >
@@ -525,7 +754,7 @@ export default function TutorsPage() {
                             className={
                               tutor.send_notifications === '1'
                                 ? "hover:bg-blue-50 hover:border-blue-200 text-blue-600 border-blue-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.send_notifications === '1' ? 'Disable notifications' : 'Enable notifications'}
                           >
@@ -547,7 +776,7 @@ export default function TutorsPage() {
                             className={
                               tutor.cancelled === '1'
                                 ? "hover:bg-red-50 hover:border-red-200 text-red-600 border-red-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={tutor.cancelled === '1' ? 'Activate tutor' : 'Cancel tutor'}
                           >
@@ -566,20 +795,39 @@ export default function TutorsPage() {
                             size="sm"
                             onClick={() => openEditDialog(tutor)}
                             className="hover:bg-blue-50 hover:border-blue-200"
+                            title="Edit tutor"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                         </>
                       )}
                       
-                      {hasPermission('tutors', 'delete') && (
+                      {hasPermission('tutors', 'delete') && !tutor.deleted_at && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteTutor(tutor.id)}
                           className="hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                          title="Delete tutor"
                         >
                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {hasPermission('tutors', 'write') && tutor.deleted_at && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRestoreTutor(tutor.id)}
+                          disabled={actionLoading === tutor.id + '_restore'}
+                          className="hover:bg-green-50 hover:border-green-200 hover:text-green-600"
+                          title="Restore tutor"
+                        >
+                          {actionLoading === tutor.id + '_restore' ? (
+                            <span className="h-4 w-4 animate-spin">⟳</span>
+                          ) : (
+                            <RotateCcw className="h-4 w-4" />
+                          )}
                         </Button>
                       )}
                     </div>
@@ -592,7 +840,7 @@ export default function TutorsPage() {
                   {/* Column 1: Contact Info */}
                   <div className="space-y-3">
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                         <Mail className="h-3 w-3" />
                         Email
                       </h4>
@@ -600,7 +848,7 @@ export default function TutorsPage() {
                     </div>
                     {tutor.phone && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Phone className="h-3 w-3" />
                           Phone
                         </h4>
@@ -609,7 +857,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.whatsapp_phone && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <MessageCircle className="h-3 w-3" />
                           WhatsApp
                         </h4>
@@ -622,7 +870,7 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.country && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <MapPin className="h-3 w-3" />
                           Location
                         </h4>
@@ -632,7 +880,7 @@ export default function TutorsPage() {
                       </div>
                     )}
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                         <MessageSquare className="h-3 w-3" />
                         Requests
                       </h4>
@@ -644,7 +892,7 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.nationality && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <User className="h-3 w-3" />
                           Nationality
                         </h4>
@@ -653,7 +901,7 @@ export default function TutorsPage() {
                     )}
                     {tutor.gender && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <UserCircle className="h-3 w-3" />
                           Gender
                         </h4>
@@ -662,16 +910,12 @@ export default function TutorsPage() {
                     )}
                     {tutor.date_of_birth && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Calendar className="h-3 w-3" />
                           Date of Birth
                         </h4>
                         <p className="text-sm font-medium">
-                          {new Date(tutor.date_of_birth).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
+                          {formatDate(tutor.date_of_birth)}
                         </p>
                       </div>
                     )}
@@ -681,30 +925,17 @@ export default function TutorsPage() {
                   <div className="space-y-3">
                     {tutor.experience_years !== null && tutor.experience_years !== undefined && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Award className="h-3 w-3" />
                           Experience
                         </h4>
                         <p className="text-sm font-medium">{tutor.experience_years} years</p>
                       </div>
                     )}
-                    {tutor.major && (
-                      <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
-                          <BookOpen className="h-3 w-3" />
-                          Major
-                        </h4>
-                        <p className="text-sm font-medium">
-                          {(() => {
-                            const subject = subjects.find(s => s.id === tutor.major!.toString());
-                            return subject?.label || `Major ID: ${tutor.major}`;
-                          })()}
-                        </p>
-                      </div>
-                    )}
+
                     {tutor.languages && tutor.languages.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-1">
                           <Languages className="h-3 w-3" />
                           Languages
                         </h4>
@@ -725,9 +956,9 @@ export default function TutorsPage() {
                 </div>
 
                 {/* Skills & Subjects Section - Compact */}
-                {(tutor.skills?.length || tutor.subjects?.length) && (
+                {(tutor.skills?.length || tutor.subjects?.length || (Array.isArray(tutor.majorId) && tutor.majorId.length > 0) || tutor.major) && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <BookOpen className="h-3 w-3" />
                       Skills & Subjects
                     </h4>
@@ -735,7 +966,7 @@ export default function TutorsPage() {
                       {/* Skills */}
                       {tutor.skills && tutor.skills.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-medium text-gray-500 mb-1">Skills</h5>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Skills</h5>
                           <div className="flex flex-wrap gap-1">
                             {tutor.skills.map((skillId) => {
                               const subject = subjects.find(s => s.id === skillId.toString());
@@ -752,7 +983,7 @@ export default function TutorsPage() {
                       {/* Subjects */}
                       {tutor.subjects && tutor.subjects.length > 0 && (
                         <div>
-                          <h5 className="text-xs font-medium text-gray-500 mb-1">Teaching Subjects</h5>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Teaching Subjects</h5>
                           <div className="flex flex-wrap gap-1">
                             {tutor.subjects.map((subjectId) => {
                               const subject = subjects.find(s => s.id === subjectId.toString());
@@ -766,6 +997,29 @@ export default function TutorsPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Majors */}
+                      {((Array.isArray(tutor.majorId) && tutor.majorId.length > 0) || tutor.major) && (
+                        <div>
+                          <h5 className="text-xs font-medium text-muted-foreground mb-1">Majors</h5>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.isArray(tutor.majorId) && tutor.majorId.length > 0 ? (
+                              tutor.majorId.map((majorId) => {
+                                const subject = subjects.find(s => s.id == majorId.toString());
+                                return (
+                                  <Badge key={majorId} variant="secondary" className="text-xs bg-purple-100 text-purple-800">
+                                    {subject?.label || `Major ${majorId}`}
+                                  </Badge>
+                                );
+                              })
+                            ) : tutor.major ? (
+                              <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800">
+                                {tutor.major}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -773,11 +1027,11 @@ export default function TutorsPage() {
                 {/* Bio Section - Compact */}
                 {tutor.bio && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <FileText className="h-3 w-3" />
                       Bio
                     </h4>
-                    <div className="text-sm text-gray-700 whitespace-pre-wrap bio-text max-w-full max-h-20 overflow-hidden">
+                    <div className="text-sm text-foreground whitespace-pre-wrap bio-text max-w-full max-h-20 overflow-hidden">
                       {tutor.bio.length > 150 ? `${tutor.bio}` : tutor.bio}
                     </div>
                   </div>
@@ -786,14 +1040,14 @@ export default function TutorsPage() {
                 {/* Education/Degrees Section */}
                 {tutor.degree && tutor.degree.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-3">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-3">
                       <GraduationCap className="h-3 w-3" />
                       Education & Certifications
                     </h4>
                     <div className="space-y-3">
                       {Array.isArray(tutor.degree) && tutor.degree.length > 0 ? (
                         tutor.degree.map((degree, index) => (
-                          <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <div key={index} className="bg-muted p-3 rounded-lg border">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
@@ -802,7 +1056,7 @@ export default function TutorsPage() {
                                   </Badge>
                                 </div>
                                 {Array.isArray(tutor.university) && tutor.university[index] && (
-                                  <p className="text-sm font-medium text-gray-700 mt-1">
+                                  <p className="text-sm font-medium text-foreground mt-1">
                                     {tutor.university[index]}
                                   </p>
                                 )}
@@ -830,13 +1084,13 @@ export default function TutorsPage() {
 
                 {Array.isArray(tutor.id_file_link) && tutor.id_file_link.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-3">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-3">
                       <FileText className="h-3 w-3" />
                       ID Documents
                     </h4>
                     <div className="space-y-3">
                       {tutor.id_file_link.map((link, idx) => (
-                        <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div key={idx} className="bg-muted p-3 rounded-lg border">
                           <div className="flex items-center gap-2">
                             <a
                               href={getImageUrl(link)}
@@ -856,13 +1110,12 @@ export default function TutorsPage() {
                 
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>Joined {typeof tutor.created_at === 'string' ? new Date(tutor.created_at).toLocaleDateString() : new Date((tutor.created_at as any)._seconds * 1000).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      {getSignInMethodIcon(tutor.sign_in_method)}
-                      <span>{getSignInMethodLabel(tutor.sign_in_method)}</span>
+                      <span>
+                        Joined{' '}
+                        {formatDate(tutor.created_at)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -872,22 +1125,43 @@ export default function TutorsPage() {
           </div>
         </LoadingOverlay>
 
-        {/* Load More Button */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleLoadMore} disabled={loading}>
-              Load More Tutors
-            </Button>
+        {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {tutors.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
           </div>
         )}
 
         {tutors.length === 0 && !loading && (
-          <Card>
+          <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="text-center">
-                <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No tutors found</h3>
-                <p className="text-gray-500 mb-4">
+                <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No tutors found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm || Object.keys(filters).length > 0 
                     ? 'No tutors match your search criteria.' 
                     : 'Tutors will appear here once they are added to the system.'

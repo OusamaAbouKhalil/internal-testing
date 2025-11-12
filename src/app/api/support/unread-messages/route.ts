@@ -19,11 +19,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Query unread messages (seen=0 and user_type != 'admin')
+    // Query unread messages (seen=false and user_type != 'admin')
     const unreadQuery = adminDb
-      .collection('customer_support_chats')
-      .where('room_id', '==', roomId)
-      .where('seen', '==', 0)
+      .collection('support_rooms')
+      .doc(roomId)
+      .collection('messages')
+      .where('seen', '==', false)
       .where('user_type', '!=', 'admin');
 
     const snapshot = await unreadQuery.get();

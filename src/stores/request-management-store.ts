@@ -5,20 +5,27 @@ import {
   doc, 
   getDoc, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc,
   query,
   where,
   orderBy,
-  limit
+  limit,
+  startAfter,
+  DocumentSnapshot,
+  QueryDocumentSnapshot
 } from 'firebase/firestore';
+import { fetchWithProgress } from '@/lib/api-progress';
+import { calculateStudentPrice, calculateTutorOfferPrice } from '@/lib/pricing-utils';
 import { db } from '@/config/firebase';
 import { 
   Request, 
   TutorOffer,
   CreateRequestData,
   UpdateRequestData,
-  RequestFilters
+  RequestFilters,
+  PaginationParams
 } from '@/types/request';
 import { combineDateAndTime, dateToTimestamp } from '@/lib/date-utils';
 
@@ -29,9 +36,24 @@ interface RequestManagementStore {
   loading: boolean;
   error: string | null;
   selectedRequest: Request | null;
+  
+  // Pagination state
+  currentPage: number;
+  pageSize: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  totalItems: number;
+  totalPages?: number;
+  lastVisibleDoc: QueryDocumentSnapshot | null;
+  firstVisibleDoc: QueryDocumentSnapshot | null;
+  pageCache: Map<number, { requests: Request[], hasNextPage: boolean, firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }>;
 
   // CRUD Actions
-  fetchRequests: (filters?: RequestFilters) => Promise<void>;
+  fetchRequests: (filters?: RequestFilters, pagination?: PaginationParams) => Promise<void>;
+  fetchNextPage: (filters?: RequestFilters) => Promise<void>;
+  fetchPreviousPage: (filters?: RequestFilters) => Promise<void>;
+  goToPage: (page: number, filters?: RequestFilters) => Promise<void>;
+  setPageSize: (pageSize: number) => void;
   fetchRequestById: (requestId: string) => Promise<Request | null>;
   createRequest: (requestData: CreateRequestData) => Promise<void>;
   updateRequest: (requestId: string, requestData: UpdateRequestData) => Promise<void>;
@@ -39,7 +61,7 @@ interface RequestManagementStore {
   
   // Request Management Actions
   changeRequestStatus: (requestId: string, status: string, reason?: string) => Promise<void>;
-  assignTutor: (requestId: string, tutorId: string, tutorPrice: string) => Promise<void>;
+  assignTutor: (requestId: string, tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => Promise<void>;
   assignStudent: (requestId: string, studentId: string, studentPrice: string) => Promise<void>;
   setTutorPrice: (requestId: string, tutorPrice: string) => Promise<void>;
   setStudentPrice: (requestId: string, studentPrice: string) => Promise<void>;
@@ -86,81 +108,63 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
   loading: false,
   error: null,
   selectedRequest: null,
+  
+  // Pagination initial state
+  currentPage: 1,
+  pageSize: 20,
+  hasNextPage: false,
+  hasPreviousPage: false,
+  totalItems: 0,
+  totalPages: 0,
+  lastVisibleDoc: null,
+  firstVisibleDoc: null,
+  pageCache: new Map(),
 
-  // Fetch requests with optional filters
-  fetchRequests: async (filters = {}) => {
+  // Fetch requests with optional filters and pagination
+  fetchRequests: async (filters = {}, pagination) => {
     try {
+      const state = get();
       set({ loading: true, error: null });
-      
-      let q = query(collection(db, 'requests'), orderBy('created_at', 'desc'));
-      console.log("filters.assistance_type: " + filters.assistance_type);
-      // Apply filters
-      if (filters.assistance_type) {
-        q = query(q, where('assistance_type', '==', filters.assistance_type));
-      }
-      
-      if (filters.request_status) {
-        q = query(q, where('request_status', '==', filters.request_status));
-      }
-      
-      if (filters.country) {
-        q = query(q, where('country', '==', filters.country));
-      }
-      
-      if (filters.language) {
-        q = query(q, where('language', '==', filters.language));
-      }
-      
-      if (filters.subject) {
-        q = query(q, where('subject', '==', filters.subject));
-      }
-      
-      if (filters.student_id) {
-        q = query(q, where('student_id', '==', filters.student_id));
-      }
-      
-      if (filters.tutor_id) {
-        q = query(q, where('tutor_id', '==', filters.tutor_id));
-      }
-      
-      const querySnapshot = await getDocs(q);
-      const requests = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Apply client-side filters
-      let filteredRequests = convertTimestamps(requests);
-      
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        filteredRequests = filteredRequests.filter((request: Request) => 
-          request.label?.toLowerCase().includes(searchTerm) ||
-          request.description?.toLowerCase().includes(searchTerm) ||
-          request.subject?.toLowerCase().includes(searchTerm) ||
-          request.language?.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      if (filters.date_from) {
-        filteredRequests = filteredRequests.filter((request: Request) => {
-          const requestDate = typeof request.date === 'string' 
-            ? new Date(request.date) 
-            : (request.date as any)?.toDate?.() || new Date();
-          return requestDate >= new Date(filters.date_from!);
-        });
-      }
-      
-      if (filters.date_to) {
-        filteredRequests = filteredRequests.filter((request: Request) => {
-          const requestDate = typeof request.date === 'string' 
-            ? new Date(request.date) 
-            : (request.date as any)?.toDate?.() || new Date();
-          return requestDate <= new Date(filters.date_to!);
-        });
-      }
-      
-      set({ requests: filteredRequests, loading: false });
+
+      const targetPage = pagination?.page || state.currentPage || 1;
+      const currentPageSize = pagination?.pageSize || state.pageSize;
+
+      const response = await fetchWithProgress('/api/requests/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: (filters as any).search || '',
+          page: targetPage,
+          perPage: currentPageSize,
+          filters: {
+            assistance_type: (filters as any).assistance_type,
+            request_status: (filters as any).request_status,
+            country: (filters as any).country,
+            language: (filters as any).language,
+            subject: (filters as any).subject,
+            student_id: (filters as any).student_id,
+            tutor_id: (filters as any).tutor_id,
+            max_rating: (filters as any).max_rating,
+          },
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Requests search failed');
+
+      const hits = (result.hits || []).map((h: any) => ({ id: h.id || h.objectID, ...h }));
+      const converted = convertTimestamps(hits);
+
+      set({
+        requests: converted,
+        currentPage: result.page || targetPage,
+        pageSize: currentPageSize,
+        hasNextPage: (result.page || targetPage) < (result.totalPages || 1),
+        hasPreviousPage: (result.page || targetPage) > 1,
+        totalItems: result.total || 0,
+        totalPages: result.totalPages || Math.ceil((result.total || 0) / currentPageSize) || 0,
+        loading: false,
+      });
     } catch (error: any) {
       console.error('Error fetching requests:', error);
       set({ 
@@ -168,6 +172,56 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         loading: false 
       });
     }
+  },
+  
+  // Fetch next page
+  fetchNextPage: async (filters = {}) => {
+    const state = get();
+    if (!state.hasNextPage || state.loading) return;
+    
+    await get().fetchRequests(filters, {
+      page: state.currentPage + 1,
+      pageSize: state.pageSize,
+      lastVisible: state.lastVisibleDoc
+    });
+  },
+  
+  // Fetch previous page
+  fetchPreviousPage: async (filters = {}) => {
+    const state = get();
+    if (!state.hasPreviousPage || state.loading) return;
+    
+    const prevPage = state.currentPage - 1;
+    await get().fetchRequests(filters, {
+      page: prevPage,
+      pageSize: state.pageSize
+    });
+  },
+  
+  // Go to specific page
+  goToPage: async (page: number, filters = {}) => {
+    const state = get();
+    
+    if (page < 1 || state.loading) {
+      return;
+    }
+    
+    // If going to page 1, force a refresh to ensure proper state
+    const forceRefresh = page === 1;
+    
+    await get().fetchRequests(filters, {
+      page,
+      pageSize: state.pageSize,
+      forceRefresh
+    });
+  },
+  
+  // Set page size
+  setPageSize: (pageSize: number) => {
+    set({ 
+      pageSize,
+      pageCache: new Map() // Clear cache when page size changes
+    });
   },
 
   // Fetch single request by ID
@@ -271,7 +325,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await addDoc(collection(db, 'requests'), newRequest);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error creating request:', error);
@@ -308,7 +362,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error updating request:', error);
@@ -327,7 +381,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await deleteDoc(doc(db, 'requests', requestId));
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error deleting request:', error);
@@ -366,7 +420,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error changing request status:', error);
@@ -378,21 +432,30 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     }
   },
 
-  assignTutor: async (requestId, tutorId, tutorPrice) => {
+  assignTutor: async (requestId, tutorId, tutorPrice, studentPrice?, minPrice?) => {
     try {
       set({ loading: true, error: null });
       
-      const updateData = {
-        tutor_id: tutorId,
-        tutor_price: tutorPrice,
-        tutor_accepted: '1',
-        request_status: 'ONGOING',
-        updated_at: new Date().toISOString()
-      };
+      const response = await fetch(`/api/requests/${requestId}/actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'assign_tutor',
+          tutorId,
+          tutorPrice,
+          studentPrice,
+          minPrice
+        }),
+      });
       
-      await updateDoc(doc(db, 'requests', requestId), updateData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to assign tutor');
+      }
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error assigning tutor:', error);
@@ -416,7 +479,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error assigning student:', error);
@@ -439,7 +502,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error setting tutor price:', error);
@@ -462,7 +525,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error setting student price:', error);
@@ -487,7 +550,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error cancelling request:', error);
@@ -516,7 +579,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error completing request:', error);
@@ -539,7 +602,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         updated_at: new Date().toISOString()
       });
       
-      set({ loading: false });
+      set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error updating request files:', error);
@@ -574,7 +637,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       const data = await response.json();
       
       if (data.success) {
-        set({ loading: false });
+        set({ loading: false, pageCache: new Map() }); // Clear cache
         get().fetchRequests(); // Refresh the list
       } else {
         throw new Error(data.error || 'Failed to update tutor payment status');
@@ -615,15 +678,28 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     }
   },
 
-  createTutorOffer: async (requestId, tutorId, price) => {
+  createTutorOffer: async (requestId, tutorId, tutorPrice) => {
     try {
       set({ loading: true, error: null });
+      
+      // Get request to get country for price calculation
+      const requestDoc = await getDoc(doc(db, 'requests', requestId));
+      if (!requestDoc.exists()) {
+        throw new Error('Request not found');
+      }
+      
+      const requestData = requestDoc.data();
+      const country = requestData?.country || null;
+      
+      // Calculate price (tutor_price × multiplier)
+      const calculatedPrice = calculateTutorOfferPrice(tutorPrice, country);
       
       const now = new Date().toISOString();
       
       const newOffer = {
         tutor_id: tutorId,
-        price: price,
+        tutor_price: tutorPrice, // What tutor will receive
+        price: calculatedPrice, // Calculated price (tutor_price × multiplier)
         request_id: requestId,
         status: 'pending',
         cancel_reason: null,
@@ -631,7 +707,24 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         updated_at: now
       };
       
-      await addDoc(collection(db, 'requests', requestId, 'tutor_offers'), newOffer);
+      // Use tutor_id as the document ID (not auto-generated)
+      const tutorOfferRef = doc(db, 'requests', requestId, 'tutor_offers', tutorId);
+      
+      // Check if offer already exists
+      const existingOffer = await getDoc(tutorOfferRef);
+      
+      if (existingOffer.exists()) {
+        // Update existing offer
+        await updateDoc(tutorOfferRef, {
+          tutor_price: tutorPrice,
+          price: calculatedPrice,
+          status: 'pending',
+          updated_at: now
+        });
+      } else {
+        // Create new offer with tutor_id as document ID
+        await setDoc(tutorOfferRef, newOffer);
+      }
       
       set({ loading: false });
       get().fetchTutorOffers(requestId); // Refresh offers
@@ -694,26 +787,79 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     try {
       set({ loading: true, error: null });
       
+      // Get the offer to get tutor info (offerId is actually tutor_id since it's the document ID)
+      const offerDoc = await getDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId));
+      if (!offerDoc.exists()) {
+        throw new Error('Offer not found');
+      }
+      
+      const offerData = offerDoc.data();
+      if (!offerData) {
+        throw new Error('Offer data not found');
+      }
+      
+      // Get request document to access country and min_price for price calculation
+      const requestDoc = await getDoc(doc(db, 'requests', requestId));
+      if (!requestDoc.exists()) {
+        throw new Error('Request not found');
+      }
+      
+      const requestData = requestDoc.data();
+      const country = requestData?.country || null;
+      const minPrice = requestData?.min_price || null;
+      const currentStudentPrice = requestData?.student_price || null;
+      
+      // Use tutor_price from offer (what tutor will receive)
+      const tutorPrice = offerData.tutor_price || offerData.price; // Fallback to price for legacy offers
+      
+      // Calculate student_price based on pricing priority rules
+      const calculatedStudentPrice = calculateStudentPrice({
+        student_price: currentStudentPrice, // Keep override if exists
+        tutor_price: tutorPrice,
+        country: country,
+        min_price: minPrice
+      });
+      
       // Update the offer status
       await updateDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId), {
         status: 'accepted',
         updated_at: new Date().toISOString()
       });
       
-      // Get the offer to get tutor info
-      const offerDoc = await getDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId));
-      const offerData = offerDoc.data();
+      // Update the request with tutor assignment
+      const updateData: any = {
+        tutor_id: offerData.tutor_id,
+        tutor_price: tutorPrice,
+        tutor_accepted: '1',
+        request_status: 'pending_payment',
+        accepted: '1',
+        updated_at: new Date().toISOString()
+      };
       
-      if (offerData) {
-        // Update the request with tutor assignment
-        await updateDoc(doc(db, 'requests', requestId), {
-          tutor_id: offerData.tutor_id,
-          tutor_price: offerData.price,
-          tutor_accepted: '1',
-          request_status: 'ONGOING',
-          updated_at: new Date().toISOString()
-        });
+      // Only update student_price if it's not already an override
+      if (!currentStudentPrice || currentStudentPrice === '0' || currentStudentPrice === '') {
+        updateData.student_price = calculatedStudentPrice;
       }
+      
+      await updateDoc(doc(db, 'requests', requestId), updateData);
+      
+      // Reject other pending offers
+      const otherOffersQuery = query(
+        collection(db, 'requests', requestId, 'tutor_offers'),
+        where('tutor_id', '!=', offerData.tutor_id),
+        where('status', '==', 'pending')
+      );
+      const otherOffersSnapshot = await getDocs(otherOffersQuery);
+      
+      const rejectPromises = otherOffersSnapshot.docs.map(doc =>
+        updateDoc(doc.ref, {
+          status: 'rejected',
+          cancel_reason: 'Another tutor was selected',
+          updated_at: new Date().toISOString()
+        })
+      );
+      
+      await Promise.all(rejectPromises);
       
       set({ loading: false });
       get().fetchTutorOffers(requestId); // Refresh offers

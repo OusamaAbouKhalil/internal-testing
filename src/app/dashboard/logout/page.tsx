@@ -27,9 +27,9 @@ export default function LogoutPage() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center">
-        <LogOut className="h-12 w-12 mx-auto mb-4 animate-pulse text-gray-400" />
-        <h1 className="text-xl font-semibold text-gray-900">Logging out...</h1>
-        <p className="text-gray-500 mt-2">Please wait while we sign you out.</p>
+        <LogOut className="h-12 w-12 mx-auto mb-4 animate-pulse text-muted-foreground" />
+        <h1 className="text-xl font-semibold text-foreground">Logging out...</h1>
+        <p className="text-muted-foreground mt-2">Please wait while we sign you out.</p>
       </div>
     </div>
   );

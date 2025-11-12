@@ -10,7 +10,7 @@ import { adminDb } from '@/config/firebase-admin';
 export async function GET(request: NextRequest) {
   try {
     // Get all rooms with their related data
-    const roomsSnapshot = await adminDb.collection('customer_support_rooms').get();
+    const roomsSnapshot = await adminDb.collection('support_rooms').get();
     const rooms = [];
 
     for (const roomDoc of roomsSnapshot.docs) {
@@ -47,8 +47,9 @@ export async function GET(request: NextRequest) {
       // Get latest message
       let latestMessage = null;
       const latestMessageQuery = adminDb
-        .collection('customer_support_chats')
-        .where('room_id', '==', roomId)
+        .collection('support_rooms')
+        .doc(roomId)
+        .collection('messages')
         .orderBy('created_at', 'desc')
         .limit(1);
 
@@ -60,9 +61,10 @@ export async function GET(request: NextRequest) {
 
       // Get unread messages count
       const unreadQuery = adminDb
-        .collection('customer_support_chats')
-        .where('room_id', '==', roomId)
-        .where('seen', '==', 0)
+        .collection('support_rooms')
+        .doc(roomId)
+        .collection('messages')
+        .where('seen', '==', false)
         .where('user_type', '!=', 'admin');
 
       const unreadSnapshot = await unreadQuery.get();
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
       if (!a.latestMessage && !b.latestMessage) return 0;
       if (!a.latestMessage) return 1;
       if (!b.latestMessage) return -1;
-      return new Date(b.latestMessage.created_at).getTime() - new Date(a.latestMessage.created_at).getTime();
+      return new Date((b.latestMessage as any).created_at).getTime() - new Date((a.latestMessage as any).created_at).getTime();
     });
 
     return NextResponse.json({

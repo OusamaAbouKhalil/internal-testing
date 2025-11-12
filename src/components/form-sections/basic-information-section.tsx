@@ -81,20 +81,20 @@ export default function BasicInformationSection({
               className={` ${emailError ? 'border-red-500' : ''}`}
             />
             {isValidatingEmail && (
-              <p className="text-sm text-gray-500 mt-1">Checking email...</p>
+              <p className="text-sm text-muted-foreground mt-1">Checking email...</p>
             )}
             {emailError && (
               <p className="text-sm text-red-500 mt-1">{emailError}</p>
             )}
             {!emailError && !isValidatingEmail && (
-              <p className="mt-1 text-xs text-gray-500">We'll never share the email with anyone else.</p>
+              <p className="mt-1 text-xs text-muted-foreground">We'll never share the email with anyone else.</p>
             )}
           </div>
 
           <div>
             <Label htmlFor="password" className="text-sm font-medium">
               Password {mode === 'create' && '*'}
-              {mode === 'edit' && <span className="text-xs text-gray-500 ml-1">(leave empty to keep current)</span>}
+              {mode === 'edit' && <span className="text-xs text-muted-foreground ml-1">(leave empty to keep current)</span>}
             </Label>
             <div className="relative">
               <Input
@@ -116,7 +116,7 @@ export default function BasicInformationSection({
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               {mode === 'create' ? 'Use at least 6 characters' : 'Use at least 6 characters (optional)'}
             </p>
           </div>
@@ -184,13 +184,13 @@ export default function BasicInformationSection({
               className={phoneError ? 'border-red-500' : ''}
             />
             {isValidatingPhone && (
-              <p className="text-sm text-gray-500 mt-1">Checking phone number...</p>
+              <p className="text-sm text-muted-foreground mt-1">Checking phone number...</p>
             )}
             {phoneError && (
               <p className="text-sm text-red-500 mt-1">{phoneError}</p>
             )}
             {!phoneError && !isValidatingPhone && Boolean((formData as any).country_code) && (
-              <p className="mt-1 text-xs text-gray-500">Country code: {(formData as any).country_code}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Country code: {(formData as any).country_code}</p>
             )}
           </div>
         </div>
@@ -234,10 +234,10 @@ export default function BasicInformationSection({
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No languages selected</p>
+                <p className="text-sm text-muted-foreground">No languages selected</p>
               )}
             </div>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Add languages in Academic Information section below
             </p>
           </div>

@@ -270,10 +270,10 @@ export function PromoCodeDialog({
 
             {mode === 'edit' && promoCode && (
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   <strong>Current Usage:</strong> {promoCode.current_usage} / {promoCode.max_usage_times}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   <strong>Status:</strong>{' '}
                   {promoCode.is_active === '1' ? (
                     <span className="text-green-600">Active</span>

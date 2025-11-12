@@ -13,7 +13,7 @@ export interface Request {
   completed: string; // "0" or "1"
   country: string;
   created_at: string | { _seconds: number; _nanoseconds: number };
-  date: string;
+  date: any;
   deadline: string;
   deleted_at: string | null;
   description: string | null;
@@ -71,7 +71,8 @@ export interface TutorOffer {
   id: string;
   cancel_reason: string | null;
   created_at: string | { _seconds: number; _nanoseconds: number };
-  price: string; // numeric stored as text
+  price: string; // numeric stored as text - calculated price (tutor_price × multiplier)
+  tutor_price: string; // numeric stored as text - what tutor will receive
   request_id: string;
   status: string;
   tutor_id: string;
@@ -85,7 +86,7 @@ export enum RequestType {
   PROJECT = 'PROJECT',
   THESIS = 'THESIS',
   ONLINE = 'ONLINE',
-  SOS = 'SOS'
+  'SOS' = 'Q&A'
 }
 
 export enum RequestStatus {
@@ -149,6 +150,9 @@ export enum BidStatus {
 
 // Helper functions for enums
 export const getRequestTypeLabel = (type: string): string => {
+  if(type === null || type === undefined) {
+    return 'Unknown';
+  }
   switch (type.toLowerCase()) {
     case 'exam':
       return 'Premium Exam Assistance';
@@ -159,8 +163,10 @@ export const getRequestTypeLabel = (type: string): string => {
     case 'thesis':
       return 'Thesis';
     case 'online':
-      return 'Online Class';
+      return 'One On One';
     case 'q&a':
+      return 'Q&A';
+    case 'sos':
       return 'Q&A';
     case 'one-on-one':
       return 'One-on-One';
@@ -194,7 +200,7 @@ export const getRequestStatusColor = (status: string): string => {
   switch (status) {
     case 'NEW':
     case 'PENDING':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
     case 'PENDING_PAYMENT':
       return 'bg-blue-100 text-blue-800';
     case 'ONGOING':
@@ -206,7 +212,7 @@ export const getRequestStatusColor = (status: string): string => {
     case 'CANCELLED':
       return 'bg-red-100 text-red-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
   }
 };
 
@@ -272,6 +278,27 @@ export interface RequestFilters {
   date_to?: string;
   student_id?: string;
   tutor_id?: string;
+  max_rating?: string; // Maximum rating (e.g., "2" for 2 stars or less)
+}
+
+// Pagination Types
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  lastVisible?: any; // Firestore document snapshot
+  forceRefresh?: boolean; // Force a refresh even if cached
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalItems?: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    lastVisible?: any;
+  };
 }
 
 // Field configurations for different assistance types

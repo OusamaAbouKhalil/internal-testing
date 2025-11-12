@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * API Route for admin joining a room
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get room
-    const roomDoc = await adminDb.collection('customer_support_rooms').doc(room_id).get();
+    const roomDoc = await adminDb.collection('support_rooms').doc(room_id).get();
     
     if (!roomDoc.exists) {
       return NextResponse.json(
@@ -29,14 +30,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update room with admin_id
-    await adminDb.collection('customer_support_rooms').doc(room_id).update({
+    // Update room with admin_id and set with_agent to true
+    await adminDb.collection('support_rooms').doc(room_id).update({
       admin_id: admin_id,
-      updated_at: new Date().toISOString()
+      with_agent: true,
+      updated_at: FieldValue.serverTimestamp()
     });
 
     // Get updated room with all related data
-    const updatedRoomDoc = await adminDb.collection('customer_support_rooms').doc(room_id).get();
+    const updatedRoomDoc = await adminDb.collection('support_rooms').doc(room_id).get();
     const roomData = updatedRoomDoc.data();
 
     // Get admin data
@@ -67,8 +69,9 @@ export async function POST(request: NextRequest) {
     // Get latest message
     let latestMessage = null;
     const latestMessageQuery = adminDb
-      .collection('customer_support_chats')
-      .where('room_id', '==', room_id)
+      .collection('support_rooms')
+      .doc(room_id)
+      .collection('messages')
       .orderBy('created_at', 'desc')
       .limit(1);
 

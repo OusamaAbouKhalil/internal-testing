@@ -23,11 +23,15 @@ interface StudentManagementStore {
   loading: boolean;
   error: string | null;
   totalCount: number;
+  totalPages: number;
   lastDoc: any;
   hasMore: boolean;
+  currentPage: number;
+  perPage: number;
+  pageHistory: any[]; // Store lastDoc for each page visited
 
   // Actions
-  fetchStudents: (filters?: StudentFilters, loadMore?: boolean) => Promise<void>;
+  fetchStudents: (filters?: StudentFilters, page?: number, direction?: 'next' | 'prev' | 'first') => Promise<void>;
   createStudent: (studentData: CreateStudentData) => Promise<void>;
   updateStudent: (studentId: string, studentData: UpdateStudentData) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
@@ -37,6 +41,8 @@ interface StudentManagementStore {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   resetPagination: () => void;
+  setCurrentPage: (page: number) => void;
+  setPerPage: (perPage: number) => void;
 }
 
 // Helper function to determine sign-in method based on social IDs
@@ -45,6 +51,23 @@ const determineSignInMethod = (student: any): 'manual' | 'facebook' | 'google' |
   if (student.google_id) return 'google';
   if (student.apple_id) return 'apple';
   return 'manual';
+};
+
+// Helper function to determine ALL sign-in methods based on social IDs
+const determineSignInMethods = (student: any): ('manual' | 'facebook' | 'google' | 'apple')[] => {
+  const methods: ('manual' | 'facebook' | 'google' | 'apple')[] = [];
+  
+  // Check for multiple social IDs
+  if (student.facebook_id) methods.push('facebook');
+  if (student.google_id) methods.push('google');
+  if (student.apple_id) methods.push('apple');
+  
+  // If no social IDs, user signed in manually
+  if (methods.length === 0) {
+    methods.push('manual');
+  }
+  
+  return methods;
 };
 
 // Helper function to convert Firestore document to Student
@@ -58,8 +81,11 @@ const convertFirestoreDocToStudent = (doc: any): Student => {
     deleted_at: data.deleted_at?.toDate?.()?.toISOString() || data.deleted_at,
   } as Student;
   
-  // Determine and add sign-in method
+  // Determine and add sign-in method (backwards compatibility)
   student.sign_in_method = determineSignInMethod(student);
+  
+  // Determine and add all sign-in methods
+  student.sign_in_methods = determineSignInMethods(student);
   
   return student;
 };
@@ -108,200 +134,68 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
   loading: false,
   error: null,
   totalCount: 0,
+  totalPages: 0,
   lastDoc: null,
   hasMore: true,
+  currentPage: 1,
+  perPage: 10,
+  pageHistory: [],
 
   // Actions
-  fetchStudents: async (filters = {}, loadMore = false) => {
+  fetchStudents: async (filters = {}, page?: number, direction?: 'next' | 'prev' | 'first') => {
     try {
       set({ loading: true, error: null });
       
-      const studentsRef = collection(db, 'students');
-      let students: Student[] = [];
+      const { currentPage, perPage } = get();
       
-      // Apply search filter with comprehensive field search
-      if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        
-        // For better performance, we'll fetch a larger set and filter client-side
-        // This reduces the number of queries while still providing comprehensive search
-        let q = query(studentsRef, orderBy('created_at', 'desc'), limit(100));
-        
-        // Apply other filters first to reduce the dataset
-        if (filters.verified !== undefined) {
-          q = query(q, where('verified', '==', filters.verified ? '1' : '0'));
-        }
-        
-        if (filters.is_banned !== undefined) {
-          q = query(q, where('is_banned', '==', filters.is_banned ? '1' : '0'));
-        }
-        
-        if (filters.student_level) {
-          q = query(q, where('student_level', '==', filters.student_level));
-        }
-        
-        if (filters.majorId) {
-          q = query(q, where('majorId', '==', filters.majorId));
-        }
-        
-        if (filters.country) {
-          q = query(q, where('country', '==', filters.country));
-        }
-        
-        if (filters.gender) {
-          q = query(q, where('gender', '==', filters.gender));
-        }
-        
-        const studentsSnapshot = await getDocs(q);
-        const allStudents = studentsSnapshot.docs.map(convertFirestoreDocToStudent);
-        
-        // Filter students by search term across all relevant fields
-        students = allStudents.filter(student => {
-          const searchableFields = [
-            student.full_name?.toLowerCase(),
-            student.nickname?.toLowerCase(),
-            student.email?.toLowerCase(),
-            student.phone_number?.toLowerCase(),
-            student.student_level?.toLowerCase(),
-            student.majorId?.toString(),
-            student.otherMajor?.toLowerCase(),
-            student.country?.toLowerCase(),
-            student.city?.toLowerCase(),
-            student.nationality?.toLowerCase(),
-            student.gender?.toLowerCase(),
-            student.request_count?.toString(), // Allow searching by request count
-            student.sign_in_method?.toLowerCase(), // Allow searching by sign-in method
-            student.spend_amount?.toString() // Allow searching by spend amount
-          ].filter(Boolean); // Remove undefined/null values
-          
-          return searchableFields.some(field => field?.includes(searchTerm));
+      // Determine target page  
+      const targetPage = page || currentPage;
+
+      // Always use Algolia for fetching students
+      const response = await fetchWithProgress('/api/students/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: filters.search || '',
+          email: filters.email,
+          nickname: filters.nickname,
+          phone_number: filters.phone_number,
+            page: targetPage,
+            perPage,
+            filters: {
+              verified: filters.verified,
+              is_banned: filters.is_banned,
+              deleted: filters.deleted,
+              sign_in_method: filters.sign_in_method,
+              country: (filters as any).country,
+              nationality: (filters as any).nationality,
+              gender: (filters as any).gender,
+              created_at_from: (filters as any).created_at_from,
+              created_at_to: (filters as any).created_at_to,
+            },
+          }),
         });
-        
-        // Sort by created_at descending
-        students = students.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        
-        // Get request counts for filtered students
-        students = await getStudentsRequestCounts(students);
-        
-        // Apply has_requests filter if specified
-        if (filters.has_requests !== undefined) {
-          students = students.filter(student => 
-            filters.has_requests ? (student.request_count || 0) > 0 : (student.request_count || 0) === 0
-          );
-        }
-        
-        // Apply sign_in_method filter if specified
-        if (filters.sign_in_method) {
-          students = students.filter(student => 
-            student.sign_in_method === filters.sign_in_method
-          );
-        }
-        
-        // Apply spend amount filters if specified
-        if (filters.min_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) >= filters.min_spend!
-          );
-        }
-        
-        if (filters.max_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) <= filters.max_spend!
-          );
-        }
-        
-        // Apply pagination to filtered results
-        const startIndex = loadMore ? get().students.length : 0;
-        const endIndex = startIndex + 20;
-        students = students.slice(startIndex, endIndex);
-        
-      } else {
-        // No search term - use regular query with other filters
-        let q = query(studentsRef, orderBy('created_at', 'desc'), limit(20));
-        
-        if (filters.verified !== undefined) {
-          q = query(q, where('verified', '==', filters.verified ? '1' : '0'));
-        }
-        
-        if (filters.is_banned !== undefined) {
-          q = query(q, where('is_banned', '==', filters.is_banned ? '1' : '0'));
-        }
-        
-        if (filters.student_level) {
-          q = query(q, where('student_level', '==', filters.student_level));
-        }
-        
-        if (filters.majorId) {
-          q = query(q, where('majorId', '==', filters.majorId));
-        }
-        
-        if (filters.country) {
-          q = query(q, where('country', '==', filters.country));
-        }
-        
-        if (filters.gender) {
-          q = query(q, where('gender', '==', filters.gender));
-        }
-        
-        // Apply pagination
-        if (loadMore && get().lastDoc) {
-          q = query(q, startAfter(get().lastDoc));
-        }
-        
-        const studentsSnapshot = await getDocs(q);
-        students = studentsSnapshot.docs.map(convertFirestoreDocToStudent);
-        
-        // Get request counts for students
-        students = await getStudentsRequestCounts(students);
-        
-        // Apply has_requests filter if specified
-        if (filters.has_requests !== undefined) {
-          students = students.filter(student => 
-            filters.has_requests ? (student.request_count || 0) > 0 : (student.request_count || 0) === 0
-          );
-        }
-        
-        // Apply sign_in_method filter if specified
-        if (filters.sign_in_method) {
-          students = students.filter(student => 
-            student.sign_in_method === filters.sign_in_method
-          );
-        }
-        
-        // Apply spend amount filters if specified
-        if (filters.min_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) >= filters.min_spend!
-          );
-        }
-        
-        if (filters.max_spend !== undefined) {
-          students = students.filter(student => 
-            (student.spend_amount || 0) <= filters.max_spend!
-          );
-        }
-        
-        set(state => ({
-          students: loadMore ? [...state.students, ...students] : students,
-          lastDoc: studentsSnapshot.docs[studentsSnapshot.docs.length - 1] || null,
-          hasMore: studentsSnapshot.docs.length === 20,
-          totalCount: loadMore ? state.totalCount : studentsSnapshot.size,
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Algolia search failed');
+
+        const hits = (result.hits || []).map((h: any) => {
+          const docLike = { id: h.id || h.objectID, data: () => h } as any;
+          return convertFirestoreDocToStudent(docLike);
+        });
+
+        const studentsWithCounts = await getStudentsRequestCounts(hits);
+
+        set({
+          students: studentsWithCounts,
+          totalCount: result.total || 0,
+          totalPages: result.totalPages || 0,
+          hasMore: targetPage < (result.totalPages || 1),
+          currentPage: targetPage,
+          // Reset Firestore cursor state while in Algolia mode
+          lastDoc: null,
+          pageHistory: [],
           loading: false,
-        }));
-      }
-      
-      // For search results, update state differently
-      if (filters.search) {
-        set(state => ({
-          students: loadMore ? [...state.students, ...students] : students,
-          lastDoc: null, // Reset pagination for search results
-          hasMore: students.length === 20, // Check if we got a full page
-          totalCount: students.length,
-          loading: false,
-        }));
-      }
+        });
       
     } catch (error: any) {
       console.error('Error fetching students:', error);
@@ -334,7 +228,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student created successfully:', result.studentId);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error creating student:', error);
       set({ 
@@ -372,7 +265,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student updated successfully:', studentId);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error updating student:', error);
       set({ 
@@ -395,7 +287,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       });
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error deleting student:', error);
       set({ 
@@ -420,7 +311,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       console.log('✅ Student verification toggled successfully:', studentId, 'to:', verified ? 'verified' : 'unverified');
       
       set({ loading: false });
-      get().fetchStudents();
     } catch (error: any) {
       console.error('Error toggling student verification:', error);
       set({ 
@@ -463,7 +353,6 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
       await Promise.all(batch);
       
       set({ loading: false });
-      get().fetchStudents(); // Refresh students list
     } catch (error: any) {
       console.error('Error importing students:', error);
       set({ 
@@ -476,5 +365,9 @@ export const useStudentManagementStore = create<StudentManagementStore>((set, ge
 
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
-  resetPagination: () => set({ lastDoc: null, hasMore: true }),
+  resetPagination: () => set({ lastDoc: null, hasMore: true, currentPage: 1, pageHistory: [], totalPages: 0 }),
+  setCurrentPage: (page) => set({ currentPage: page }),
+  setPerPage: (perPage) => {
+    set({ perPage, currentPage: 1 });
+  },
 }));

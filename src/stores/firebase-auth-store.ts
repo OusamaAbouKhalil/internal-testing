@@ -133,11 +133,33 @@ const initializeDefaultPermissions = async () => {
       { name: 'Delete Notifications', resource: 'notifications', action: 'delete', description: 'Delete notifications' },
       { name: 'Manage Notifications', resource: 'notifications', action: 'manage', description: 'Full notification management' },
 
+      // Support management permissions
+      { name: 'Read Support', resource: 'support', action: 'read', description: 'View support conversations' },
+      { name: 'Write Support', resource: 'support', action: 'write', description: 'Send support messages' },
+      { name: 'Manage Support', resource: 'support', action: 'manage', description: 'Full support management' },
+
       // Promo code management permissions
       { name: 'Read Promo Codes', resource: 'promo_codes', action: 'read', description: 'View promo codes' },
       { name: 'Write Promo Codes', resource: 'promo_codes', action: 'write', description: 'Create and update promo codes' },
       { name: 'Delete Promo Codes', resource: 'promo_codes', action: 'delete', description: 'Delete promo codes' },
       { name: 'Manage Promo Codes', resource: 'promo_codes', action: 'manage', description: 'Full promo code management' },
+
+      // Reports management permissions
+      { name: 'Read Reports', resource: 'reports', action: 'read', description: 'View reports' },
+      { name: 'Manage Reports', resource: 'reports', action: 'manage', description: 'Full report management' },
+
+      // Customer support management permissions
+      { name: 'Read Customer Support', resource: 'customer-support', action: 'read', description: 'View customer support conversations' },
+      { name: 'Write Customer Support', resource: 'customer-support', action: 'write', description: 'Send customer support messages' },
+      { name: 'Manage Customer Support', resource: 'customer-support', action: 'manage', description: 'Full customer support management' },
+
+      // Requests management permissions
+      { name: 'Read Requests', resource: 'requests', action: 'read', description: 'View requests' },
+      { name: 'Manage Requests', resource: 'requests', action: 'manage', description: 'Full request management' },
+
+      // Price access request permissions
+      { name: 'Request Tutor Price', resource: 'requests', action: 'request_tutor_price', description: 'Request access to tutor pricing' },
+      { name: 'Request Student Price', resource: 'requests', action: 'request_student_price', description: 'Request access to student pricing' },
     ];
 
     for (const permission of defaultPermissions) {

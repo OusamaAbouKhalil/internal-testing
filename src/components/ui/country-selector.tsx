@@ -97,7 +97,7 @@ export function CountrySelector({
       <Label htmlFor="country-selector">{label}</Label>
       <div className="relative" ref={dropdownRef}>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="country-selector"
             value={selectedCountry ? selectedCountry.label : searchTerm}
@@ -129,7 +129,7 @@ export function CountrySelector({
         {isDropdownOpen && (
           <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
             {loading ? (
-              <div className="px-4 py-2 text-gray-500 text-sm">Loading countries...</div>
+              <div className="px-4 py-2 text-muted-foreground text-sm">Loading countries...</div>
             ) : filteredCountries.length > 0 ? (
               filteredCountries.map((country) => (
                 <button
@@ -149,10 +149,10 @@ export function CountrySelector({
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900 truncate">
+                        <span className="font-medium text-foreground truncate">
                           {country.label}
                         </span>
-                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                           <span className="flex items-center">
                             <Phone className="h-3 w-3 mr-1" />
                             {country.countryCode}
@@ -163,7 +163,7 @@ export function CountrySelector({
                           </span>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-500 truncate">
+                      <div className="text-sm text-muted-foreground truncate">
                         Capital: {country.capital}
                       </div>
                     </div>
@@ -171,7 +171,7 @@ export function CountrySelector({
                 </button>
               ))
             ) : (
-              <div className="px-4 py-2 text-gray-500 text-sm">
+              <div className="px-4 py-2 text-muted-foreground text-sm">
                 No countries found
               </div>
             )}
@@ -192,8 +192,8 @@ export function CountrySelector({
               }}
             />
             <div className="flex-1">
-              <div className="font-medium text-gray-900">{selectedCountry.label}</div>
-              <div className="text-sm text-gray-500">
+              <div className="font-medium text-foreground">{selectedCountry.label}</div>
+              <div className="text-sm text-muted-foreground">
                 {selectedCountry.capital} • {selectedCountry.countryCode} • {selectedCountry.iso}
               </div>
             </div>

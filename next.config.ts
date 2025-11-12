@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['firebase-admin'],
-  },
+  serverExternalPackages: ['firebase-admin'],
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Mark firebase-admin and @google-cloud packages as external for server bundles

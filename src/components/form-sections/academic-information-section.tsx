@@ -174,7 +174,7 @@ export default function AcademicInformationSection({
                       </button>
                     ))
                   ) : (
-                    <div className="px-4 py-2 text-gray-500 text-sm">No subjects found</div>
+                    <div className="px-4 py-2 text-muted-foreground text-sm">No subjects found</div>
                   )}
                 </div>
               )}
@@ -194,7 +194,7 @@ export default function AcademicInformationSection({
               onChange={(e) => onFieldChange('otherMajor', e.target.value || null)}
               placeholder="Enter custom major..."
             />
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Required when "Other" major is selected
             </p>
           </div>
@@ -240,7 +240,7 @@ export default function AcademicInformationSection({
                     );
                   })
                 ) : (
-                  <div className="px-4 py-2 text-gray-500 text-sm">No languages found</div>
+                  <div className="px-4 py-2 text-muted-foreground text-sm">No languages found</div>
                 )}
               </div>
             )}

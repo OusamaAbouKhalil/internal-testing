@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * API Route for getting messages by room ID
@@ -24,18 +25,19 @@ export async function GET(
 
     // Mark all messages in this room as seen
     const messagesSnapshot = await adminDb
-      .collection('customer_support_chats')
-      .where('room_id', '==', roomId)
+      .collection('support_rooms')
+      .doc(roomId)
+      .collection('messages')
       .get();
 
     const batch = adminDb.batch();
     messagesSnapshot.docs.forEach(doc => {
-      batch.update(doc.ref, { seen: 1 });
+      batch.update(doc.ref, { seen: true });
     });
     await batch.commit();
 
     // Get room with all related data
-    const roomDoc = await adminDb.collection('customer_support_rooms').doc(roomId).get();
+    const roomDoc = await adminDb.collection('support_rooms').doc(roomId).get();
     
     if (!roomDoc.exists) {
       return NextResponse.json(
@@ -76,8 +78,9 @@ export async function GET(
 
     // Get all messages for this room
     const messagesQuery = adminDb
-      .collection('customer_support_chats')
-      .where('room_id', '==', roomId)
+      .collection('support_rooms')
+      .doc(roomId)
+      .collection('messages')
       .orderBy('created_at', 'asc');
 
     const messagesSnapshot2 = await messagesQuery.get();

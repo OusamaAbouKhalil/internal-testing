@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useRequestManagementStore } from '@/stores/request-management-store';
 import { Request, RequestFilters, RequestStatus, RequestType } from '@/types/request';
 import { getRequestTypeLabel } from '@/types/request';
@@ -24,6 +24,7 @@ import { StatusManagement } from '@/components/status-management';
 import { AssignmentManagement } from '@/components/assignment-management';
 import { TutorOffersManagement } from '@/components/tutor-offers-management';
 import { combineDateAndTime, formatDate as formatDateUtil, formatDateWithTimezone } from '@/lib/date-utils';
+import { getEffectiveStudentPrice } from '@/lib/pricing-utils';
 import { 
   Plus, 
   Search, 
@@ -45,6 +46,70 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useFirebaseAuthStore } from '@/stores/firebase-auth-store';
+
+function StudentInfoButton({ studentId }: { studentId?: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [student, setStudent] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { hasPermission } = useFirebaseAuthStore();
+  useEffect(() => {
+    if (isOpen && studentId && !student && !loading) {
+      setLoading(true);
+      fetch(`/api/students/${studentId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.success) setStudent(data.student);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen, studentId, student, loading]);
+
+  if (!studentId) return null;
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className="h-8 px-2"
+        title="View student details"
+      >
+        <UserPlus className="h-4 w-4 mr-1" />
+        Student
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Student Details</DialogTitle>
+          </DialogHeader>
+          {loading ? (
+            <div className="py-6"><LoadingSpinner /></div>
+          ) : student ? (
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Full name:</span><span className="font-medium">{student.full_name || 'N/A'}</span></div>
+              {student.nickname && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Nickname:</span><span className="font-medium">@{student.nickname}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Email:</span><span className="font-medium break-all">{student.email || 'N/A'}</span></div>
+              {(student.country_code || student.phone_number) && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Phone:</span><span className="font-medium">{(student.country_code || '')}{(student.phone_number || '')}</span></div>
+              )}
+              {(student.country || student.city) && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Location:</span><span className="font-medium">{student.city ? `${student.city}, ${student.country || ''}` : (student.country || 'N/A')}</span></div>
+              )}
+            </div>
+          ) : (
+            <div className="py-4 text-sm text-muted-foreground">No student found.</div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 function ChatButton({ request }: { request: Request }) {
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -134,42 +199,118 @@ function ChatButton({ request }: { request: Request }) {
 }
 
 function RequestCard({ request }: { request: Request }) {
-  const formatDate = (value: any) => {
-    if (!value) return 'Not set';
-    
-    try {
-      let date: Date;
-      if (value.toDate && typeof value.toDate === 'function') {
-        date = value.toDate();
-      } else if (typeof value === 'string' || typeof value === 'number') {
-        date = new Date(value);
-      } else {
-        return 'Invalid date';
-      }
-      
-      if (isNaN(date.getTime())) {
-        return 'Invalid date';
-      }
-      
-      return format(date, 'MMM dd, yyyy');
-    } catch (error) {
-      console.error('Error formatting date:', error, value);
-      return 'Invalid date';
-    }
-  };
+  const { hasPermission } = useFirebaseAuthStore();
+	const formatDate = (value: any) => {
+    console.log("date is: " + value)
+		if (value === undefined || value === null) return 'Not set';
+		try {
+			let date: Date | null = null;
+
+			// Firestore Timestamp instance with toDate()
+			if (value && typeof value.toDate === 'function') {
+				date = value.toDate();
+			}
+			// Firestore-like object with seconds/_seconds and optional nanoseconds
+			else if (value && typeof value === 'object' && (
+					('seconds' in value) || ('_seconds' in value)
+				)) {
+				const seconds = (value.seconds ?? value._seconds) as number;
+				const nanos = (value.nanoseconds ?? value._nanoseconds ?? 0) as number;
+				if (typeof seconds === 'number') {
+					date = new Date(seconds * 1000 + Math.floor(nanos / 1e6));
+				}
+			}
+			// Native Date
+			else if (value instanceof Date) {
+				date = value;
+			}
+			// Numeric epoch (ms or seconds)
+			else if (typeof value === 'number') {
+				// Heuristic: < 1e12 => seconds, else milliseconds
+				const ms = value < 1e12 ? value * 1000 : value;
+				date = new Date(ms);
+			}
+			// String input (ISO, RFC, or numeric string)
+			else if (typeof value === 'string') {
+				const trimmed = value.trim();
+				if (trimmed === '') return 'Not set';
+				// If purely numeric (or numeric with decimal), treat as epoch
+				if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmed)) {
+					const num = parseFloat(trimmed);
+					const ms = num < 1e12 ? num * 1000 : num;
+					date = new Date(ms);
+				} else {
+					date = new Date(trimmed);
+				}
+			}
+
+			if (!date || isNaN(date.getTime())) return 'Invalid date';
+			return format(date, 'MMM dd, yyyy');
+		} catch {
+			return 'Invalid date';
+		}
+	};
 
   const formatDeadline = (request: Request) => {
     try {
-      // If we have both date and time, combine them
-      if (request.date && request.deadline) {
-        const combinedDate = combineDateAndTime(request.date, request.deadline);
-        // Use timezone if available, otherwise use local formatting
-        if (request.timezone) {
-          return formatDateWithTimezone(combinedDate, 'MMM dd, yyyy HH:mm', request.timezone);
+      if (request.deadline) {
+        const rawDeadline: any = request.deadline;
+        const trimmedDeadline = typeof rawDeadline === 'string' ? rawDeadline.trim() : rawDeadline;
+
+        // Case 1: deadline is time-only like "HH:MM" → combine with request.date
+        if (typeof trimmedDeadline === 'string' && /^\d{1,2}:\d{2}$/.test(trimmedDeadline)) {
+          const dateString = request.date;
+          console.log("date string is: " + dateString)
+          if (dateString && typeof dateString === 'string') {
+            const combined = combineDateAndTime(dateString, trimmedDeadline);
+            if (request.timezone) {
+              return formatDateWithTimezone(combined, 'MMM dd, yyyy HH:mm', request.timezone);
+            }
+            return format(combined, 'MMM dd, yyyy HH:mm');
+          } else {
+            console.log("date string is not: " + dateString)
+          }
+          // No valid date to combine with → just show time
+          return trimmedDeadline;
         }
-        return format(combinedDate, 'MMM dd, yyyy HH:mm');
+
+        // Else: parse deadline as a date/time value
+        let parsed: Date | null = null;
+        if (typeof rawDeadline === 'string') {
+          // numeric epoch string
+          if (/^[-+]?\d+(?:\.\d+)?$/.test(trimmedDeadline)) {
+            const num = parseFloat(trimmedDeadline);
+            const ms = num < 1e12 ? num * 1000 : num;
+            parsed = new Date(ms);
+          } else {
+            parsed = new Date(trimmedDeadline);
+          }
+        } else if (typeof rawDeadline === 'number') {
+          const ms = rawDeadline < 1e12 ? rawDeadline * 1000 : rawDeadline;
+          parsed = new Date(ms);
+        } else if (rawDeadline && typeof rawDeadline.toDate === 'function') {
+          parsed = rawDeadline.toDate();
+        } else if (rawDeadline instanceof Date) {
+          parsed = rawDeadline;
+        }
+
+        if (!parsed || isNaN(parsed.getTime())) {
+          return 'Invalid date';
+        }
+
+        // Case 2: deadline is a full date → display time only
+        if (request.timezone) {
+          // Use Intl for timezone, extracting time only (HH:mm 24h)
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: request.timezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(parsed);
+          return parts;
+        }
+        return format(parsed, 'HH:mm');
       }
-      
       return 'Not set';
     } catch (error) {
       console.error('Error formatting deadline:', error);
@@ -214,43 +355,97 @@ function RequestCard({ request }: { request: Request }) {
           <Badge className={`text-xs ${getRequestStatusColor(request.request_status)}`}>
             {getRequestStatusLabel(request.request_status)}
           </Badge>
+          {/* Student quick view */}
+          <StudentInfoButton studentId={request.student_id} />
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
+
+          {request.cancel_reason && (
+            <div className="flex justify-between text-sm gap-2">
+              <span className="text-muted-foreground flex-shrink-0">Cancel Reason:</span>
+              <span className="font-medium text-right ">{request.cancel_reason}</span>
+            </div>
+          )}
+
+          <div className="flex justify-between text-sm gap-2">
+            <span className="text-muted-foreground flex-shrink-0">Type:</span>
+            <span className="font-medium text-right ">
+              {(request.exam_type && request.exam_type.toLowerCase() === 'sos') ? 'Q&A' : (request.exam_type || 'N/A')}
+            </span>
+          </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Subject:</span>
-            <span className="font-medium text-right truncate">{request.subject}</span>
+            <span className="font-medium text-right ">{request.subject}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Sub Subject:</span>
-            <span className="font-medium text-right truncate">{request.sub_subject}</span>
+            <span className="font-medium text-right ">{request.sub_subject}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Language:</span>
-            <span className="font-medium text-right truncate">{request.language}</span>
+            <span className="font-medium text-right ">{request.language}</span>
           </div>
           <div className="flex justify-between text-sm gap-2">
             <span className="text-muted-foreground flex-shrink-0">Country:</span>
-            <span className="font-medium text-right truncate">{request.country}</span>
+            <span className="font-medium text-right ">{request.country}</span>
           </div>
         </div>
         
         <div className="border-t pt-3">
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
-              <span className="text-muted-foreground">Student Price:</span>
-              <div className="font-semibold text-green-600">${request.student_price}</div>
+              {/* Show Student Price only if user has 'requests:request_student_price' permission */}
+              {hasPermission('requests', 'request_student_price') ? (() => {
+                const effectivePrice = getEffectiveStudentPrice({
+                  student_price: request.student_price,
+                  tutor_price: request.tutor_price,
+                  country: request.country,
+                  min_price: request.min_price
+                });
+                return (
+                  <>
+                    <span className="text-muted-foreground">Student Price:</span>
+                    <div className="font-semibold text-green-600">
+                      ${effectivePrice.price}
+                      {effectivePrice.isOverride && (
+                        <span className="ml-1 text-xs text-muted-foreground">(override)</span>
+                      )}
+                    </div>
+                  </>
+                );
+              })() : (
+                <>
+                  <span className="text-muted-foreground">Student Price:</span>
+                  <div className="font-semibold text-green-600">Hidden</div>
+                </>
+              )}
             </div>
             <div>
-              <span className="text-muted-foreground">Tutor Price:</span>
-              <div className="font-semibold text-blue-600">${request.tutor_price}</div>
+              {/* Show Tutor Price only if user has 'requests:request_tutor_price' permission */}
+              {hasPermission('requests', 'request_tutor_price') ? (
+                <>
+                  <span className="text-muted-foreground">Tutor Price:</span>
+                  <div className="font-semibold text-blue-600">${request.tutor_price || '0'}</div>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">Tutor Price:</span>
+                  <div className="font-semibold text-blue-600">Hidden</div>
+                </>
+              )}
             </div>
           </div>
         </div>
         
         <div className="border-t pt-3">
           <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duration:</span>
+              <span className="font-medium">{request.duration ? `${request.duration}` : 'N/A'}</span>
+            </div>
+            
             <div className="flex justify-between">
               <span className="text-muted-foreground">Deadline:</span>
               <span className="font-medium">{formatDeadline(request)}</span>
@@ -278,6 +473,7 @@ function RequestCard({ request }: { request: Request }) {
 function RequestActions({ request }: { request: Request }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState('details');
+  const [descriptionValue, setDescriptionValue] = useState<string>(request.description || '');
   
   const {
     changeRequestStatus,
@@ -289,7 +485,8 @@ function RequestActions({ request }: { request: Request }) {
     completeRequest,
     fetchTutorOffers,
     tutorOffers,
-    loading
+    loading,
+    updateRequest
   } = useRequestManagementStore();
 
   const handleStatusChange = async (status: string, reason?: string) => {
@@ -301,22 +498,25 @@ function RequestActions({ request }: { request: Request }) {
     }
   };
 
-  const handleAssignTutor = async (tutorId: string, tutorPrice: string) => {
+  const handleAssignTutor = async (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => {
     try {
-      await assignTutor(request.id, tutorId, tutorPrice);
+      await assignTutor(request.id, tutorId, tutorPrice, studentPrice, minPrice);
       setIsOpen(false);
     } catch (error) {
       console.error('Error assigning tutor:', error);
     }
   };
 
-  const handleSetPrices = async (tutorPrice?: string, studentPrice?: string) => {
+  // Sync local description when request changes
+  useEffect(() => {
+    setDescriptionValue(request.description || '');
+  }, [request.description]);
+
+  const handleSaveDescription = async () => {
     try {
-      await setTutorPrice(request.id, tutorPrice ? tutorPrice : '');
-      await setStudentPrice(request.id, studentPrice ? studentPrice : '');
-      setIsOpen(false);
+      await updateRequest(request.id, { description: descriptionValue });
     } catch (error) {
-      console.error('Error setting prices:', error);
+      console.error('Error updating description:', error);
     }
   };
 
@@ -352,6 +552,24 @@ function RequestActions({ request }: { request: Request }) {
           
           <TabsContent value="details" className="space-y-4">
             <RequestDetails request={request} />
+            <div className="space-y-2">
+              <Label className="text-sm">Edit Description</Label>
+              <Textarea
+                value={descriptionValue}
+                onChange={(e) => setDescriptionValue(e.target.value)}
+                rows={4}
+                placeholder="Update request description"
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveDescription}
+                  disabled={loading || (descriptionValue || '') === (request.description || '')}
+                >
+                  Save Description
+                </Button>
+              </div>
+            </div>
           </TabsContent>
           
           <TabsContent value="status" className="space-y-4">
@@ -366,7 +584,6 @@ function RequestActions({ request }: { request: Request }) {
             <AssignmentManagement 
               request={request}
               onAssignTutor={handleAssignTutor}
-              onSetPrices={handleSetPrices}
               loading={loading}
             />
           </TabsContent>
@@ -412,7 +629,7 @@ function getRequestStatusColor(status: string): string {
   switch (status?.toLowerCase()) {
     case 'new':
     case 'pending':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
     case 'pending_payment':
       return 'bg-blue-100 text-blue-800';
     case 'ongoing':
@@ -424,41 +641,181 @@ function getRequestStatusColor(status: string): string {
     case 'cancelled':
       return 'bg-red-100 text-red-800';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-muted text-foreground';
   }
 }
 
 export default function RequestsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const {
     requests,
     loading,
     error,
     fetchRequests,
-    createRequest
+    createRequest,
+    fetchNextPage,
+    fetchPreviousPage,
+    goToPage,
+    setPageSize,
+    currentPage,
+    pageSize,
+    hasNextPage,
+    hasPreviousPage,
+    totalPages,
+    totalItems
   } = useRequestManagementStore();
 
-  const [filters, setFilters] = useState<RequestFilters>({});
+  // Initialize filters from URL params
+  const getInitialFilters = useCallback((): RequestFilters => {
+    const initialFilters: RequestFilters = {};
+    if (searchParams.get('request_status')) {
+      initialFilters.request_status = searchParams.get('request_status') || undefined;
+    }
+    if (searchParams.get('student_id')) {
+      initialFilters.student_id = searchParams.get('student_id') || undefined;
+    }
+    if (searchParams.get('max_rating')) {
+      initialFilters.max_rating = searchParams.get('max_rating') || undefined;
+    }
+    return initialFilters;
+  }, [searchParams]);
+
+  const [filters, setFilters] = useState<RequestFilters>(getInitialFilters());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [columnsCount, setColumnsCount] = useState(3);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const filterChangeSourceRef = useRef<'url' | 'manual'>('manual');
 
   // Create dynamic request type options from RequestType enum
   const requestTypeOptions = Object.values(RequestType).map(type => ({
-    value: type,
+    value: type === RequestType.SOS ? 'SOS' : type,
     label: getRequestTypeLabel(type)
   }));
 
+  // Debounce search term (500ms)
   useEffect(() => {
-    fetchRequests(filters);
-  }, [fetchRequests, filters]);
+    const t = setTimeout(() => {
+      filterChangeSourceRef.current = 'manual';
+      setFilters(prev => {
+        const next = { ...prev } as any;
+        if (debouncedSearchTerm) {
+          next.search = debouncedSearchTerm;
+        } else {
+          delete next.search;
+        }
+        return next;
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [debouncedSearchTerm]);
+
+  useEffect(() => {
+    // Initial load - use filters from URL params
+    if (isInitialLoad) {
+      filterChangeSourceRef.current = 'url';
+      const initialFilters = getInitialFilters();
+      if (Object.keys(initialFilters).length > 0) {
+        setFilters(initialFilters);
+        fetchRequests(initialFilters, { page: 1, pageSize });
+      } else {
+        fetchRequests({}, { page: 1, pageSize });
+      }
+      setIsInitialLoad(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update filters when URL params change (but not when user manually changes filters)
+  useEffect(() => {
+    if (!isInitialLoad && filterChangeSourceRef.current !== 'manual') {
+      filterChangeSourceRef.current = 'url';
+      const urlFilters = getInitialFilters();
+      const urlFiltersStr = JSON.stringify(urlFilters);
+      const currentFiltersStr = JSON.stringify(filters);
+      if (urlFiltersStr !== currentFiltersStr) {
+        setFilters(urlFilters);
+        setSearchTerm('');
+        setDebouncedSearchTerm('');
+        fetchRequests(urlFilters, { page: 1, pageSize });
+      }
+      // Reset ref after processing URL change
+      setTimeout(() => {
+        filterChangeSourceRef.current = 'manual';
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Fetch requests when filters change (only for manual changes)
+  useEffect(() => {
+    if (!isInitialLoad && filterChangeSourceRef.current === 'manual') {
+      // Reset to page 1 and clear cache when filters change
+      setPageSize(pageSize); // This clears the cache
+      fetchRequests(filters, { page: 1, pageSize });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const handleFilterChange = (key: keyof RequestFilters, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value || undefined
-    }));
+    filterChangeSourceRef.current = 'manual';
+    setFilters(prev => {
+      const newFilters = { ...prev };
+      if (value) {
+        newFilters[key] = value;
+      } else {
+        delete newFilters[key];
+      }
+      return newFilters;
+    });
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    // Clear URL parameters
+    router.push('/dashboard/requests');
+  };
+
+  const handleNextPage = () => {
+    fetchNextPage(filters);
+  };
+
+  const handlePreviousPage = () => {
+    fetchPreviousPage(filters);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    fetchRequests(filters);
+  };
+
+  const handleGoToPage = (page: number) => {
+    goToPage(page, filters);
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const total = totalPages || 0;
+    if (total <= 0) return [1];
+    if (total <= 7) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+      return pages;
+    }
+    // Always show first and last
+    pages.push(1);
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(total - 1, currentPage + 1);
+    if (start > 2) pages.push('...');
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < total - 1) pages.push('...');
+    pages.push(total);
+    return pages;
   };
 
   const handleCreateRequest = async (requestData: any) => {
@@ -536,7 +893,14 @@ export default function RequestsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>Filters</CardTitle>
+            {Object.keys(filters).length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                Clear Filters
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -544,15 +908,21 @@ export default function RequestsPage() {
               <Label>Search</Label>
               <Input
                 placeholder="Search requests..."
-                value={filters.search || ''}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setDebouncedSearchTerm(e.target.value);
+                }}
               />
             </div>
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
+                key={`type-${filters.assistance_type || 'all'}`}
                 value={filters.assistance_type || 'all'}
-                onValueChange={(value) => handleFilterChange('assistance_type', value === 'all' ? '' : value)}
+                onValueChange={(value) => {
+                  handleFilterChange('assistance_type', value === 'all' ? '' : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All types" />
@@ -570,8 +940,11 @@ export default function RequestsPage() {
             <div className="space-y-2">
               <Label>Status</Label>
               <Select
+                key={`status-${filters.request_status || 'all'}`}
                 value={filters.request_status || 'all'}
-                onValueChange={(value) => handleFilterChange('request_status', value === 'all' ? '' : value)}
+                onValueChange={(value) => {
+                  handleFilterChange('request_status', value === 'all' ? '' : value);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
@@ -589,21 +962,113 @@ export default function RequestsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Country</Label>
-              <Input
-                placeholder="Country"
-                value={filters.country || ''}
-                onChange={(e) => handleFilterChange('country', e.target.value)}
-              />
+              <Label>Rating (Stars)</Label>
+              <Select
+                key={`rating-${filters.max_rating || 'all'}`}
+                value={filters.max_rating || 'all'}
+                onValueChange={(value) => {
+                  handleFilterChange('max_rating', value === 'all' ? '' : value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All ratings" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ratings</SelectItem>
+                  <SelectItem value="1">1 star or less</SelectItem>
+                  <SelectItem value="2">2 stars or less</SelectItem>
+                  <SelectItem value="3">3 stars or less</SelectItem>
+                  <SelectItem value="4">4 stars or less</SelectItem>
+                  <SelectItem value="5">5 stars or less</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {/* Country filter removed as requested */}
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Requests ({requests.length})</h2>
-        </div>
+        {/* Header with Pagination Controls */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
+                <h2 className="text-xl font-semibold">
+                  Requests
+                  <span className="ml-2 text-sm text-muted-foreground font-normal">
+                    Showing {requests.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0} - {Math.min(currentPage * pageSize, totalItems || 0)} of {totalItems || 0}
+                  </span>
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Items per page:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={!hasPreviousPage || loading}
+                  className="mr-2"
+                >
+                  Previous
+                </Button>
+                
+                {getPageNumbers().map((pageNum, index) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  const isCurrentPage = pageNum === currentPage;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={isCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => !isCurrentPage && handleGoToPage(pageNum as number)}
+                      disabled={loading}
+                      className={isCurrentPage ? "font-bold" : ""}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={!hasNextPage || loading}
+                  className="ml-2"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
         {requests.length === 0 ? (
           <Card>
@@ -620,6 +1085,86 @@ export default function RequestsPage() {
             </div>
           </div>
         )}
+        
+        {/* Footer Pagination Controls */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {requests.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0} - {Math.min(currentPage * pageSize, totalItems || 0)} of {totalItems || 0}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Items per page:</Label>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={!hasPreviousPage || loading}
+                  className="mr-2"
+                >
+                  Previous
+                </Button>
+                
+                {getPageNumbers().map((pageNum, index) => {
+                  if (pageNum === '...') {
+                    return (
+                      <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">
+                        ...
+                      </span>
+                    );
+                  }
+                  
+                  const isCurrentPage = pageNum === currentPage;
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={isCurrentPage ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => !isCurrentPage && handleGoToPage(pageNum as number)}
+                      disabled={loading}
+                      className={isCurrentPage ? "font-bold" : ""}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={!hasNextPage || loading}
+                  className="ml-2"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

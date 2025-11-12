@@ -108,7 +108,7 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'new':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
       case 'ongoing':
@@ -118,7 +118,7 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -137,7 +137,7 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
       case 'SOS':
         return 'bg-pink-100 text-pink-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -171,7 +171,7 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
 
           <div className="space-y-6">
             {/* Header Information */}
-            <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="p-4 bg-muted rounded-lg">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold mb-2">{request.label}</h3>
@@ -226,7 +226,7 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
             {request.description && (
               <div className="p-4 bg-white border rounded-lg">
                 <h4 className="font-medium mb-2">Description</h4>
-                <p className="text-gray-700 whitespace-pre-wrap">
+                <p className="text-foreground whitespace-pre-wrap">
                   {request.description}
                 </p>
               </div>
@@ -288,8 +288,8 @@ export function RequestActions({ request, trigger, onClose, showFullActions = tr
         </DialogHeader>
         
         <div className="text-center py-8">
-          <p className="text-gray-600">Full request management interface</p>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-muted-foreground">Full request management interface</p>
+          <p className="text-sm text-muted-foreground mt-2">
             This would include the full tabs interface with Details, Status, Assignment, and Tutor Offers
           </p>
           <Button 

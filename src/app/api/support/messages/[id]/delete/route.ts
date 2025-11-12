@@ -5,7 +5,7 @@ import { adminDb } from '@/config/firebase-admin';
 
 /**
  * API Route for deleting messages
- * DELETE /api/support/messages/[id]
+ * DELETE /api/support/messages/[id]/delete?room_id=xxx&user_type=xxx
  */
 export async function DELETE(
   request: NextRequest,
@@ -26,20 +26,8 @@ export async function DELETE(
       );
     }
 
-    // Get message
-    const messageDoc = await adminDb.collection('customer_support_chats').doc(messageId).get();
-    
-    if (!messageDoc.exists) {
-      return NextResponse.json(
-        { success: false, error: 'Message not found' },
-        { status: 404 }
-      );
-    }
-
-    const messageData = messageDoc.data();
-
-    // Get room data
-    const roomDoc = await adminDb.collection('customer_support_rooms').doc(roomId).get();
+    // Get room data first to verify it exists
+    const roomDoc = await adminDb.collection('support_rooms').doc(roomId).get();
     
     if (!roomDoc.exists) {
       return NextResponse.json(
@@ -50,6 +38,23 @@ export async function DELETE(
 
     const roomData = roomDoc.data();
 
+    // Get message from the subcollection
+    const messageDoc = await adminDb
+      .collection('support_rooms')
+      .doc(roomId)
+      .collection('messages')
+      .doc(messageId)
+      .get();
+    
+    if (!messageDoc.exists) {
+      return NextResponse.json(
+        { success: false, error: 'Message not found' },
+        { status: 404 }
+      );
+    }
+
+    const messageData = messageDoc.data();
+
     // Handle Firebase notifications before deletion
     if (userType !== 'admin') {
       // Send notification to admin users
@@ -58,13 +63,13 @@ export async function DELETE(
         body: message,
         room_id: roomId,
         message_id: messageId,
-        sender_id: messageData.sender_id,
+        sender_id: messageData?.sender_id,
         user_type: userType,
         type: 'delete_message_support'
       });
     } else {
       // Send notification to student/tutor
-      let targetUser = null;
+      let targetUser: any = null;
       
       if (roomData?.user_type === 'student' && roomData?.user_id) {
         const studentDoc = await adminDb.collection('students').doc(roomData.user_id).get();
@@ -93,8 +98,13 @@ export async function DELETE(
       }
     }
 
-    // Delete the message
-    await adminDb.collection('customer_support_chats').doc(messageId).delete();
+    // Delete the message from the subcollection
+    await adminDb
+      .collection('support_rooms')
+      .doc(roomId)
+      .collection('messages')
+      .doc(messageId)
+      .delete();
 
     return NextResponse.json({
       success: true,

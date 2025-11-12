@@ -45,7 +45,7 @@ export function TutorOffersManagement({
     switch (status?.toLowerCase()) {
       case 'new':
       case 'pending':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
       case 'pending_payment':
         return 'bg-blue-100 text-blue-800';
       case 'ongoing':
@@ -57,7 +57,7 @@ export function TutorOffersManagement({
       case 'cancelled':
         return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-muted text-foreground';
     }
   };
 
@@ -135,13 +135,18 @@ export function TutorOffersManagement({
                       ) : tutorInfo ? (
                         <div>
                           <div className="font-medium">{tutorInfo.nickname}</div>
-                          <div className="text-sm text-gray-600">{tutorInfo.email}</div>
+                          <div className="text-sm text-muted-foreground">{tutorInfo.email}</div>
                         </div>
                       ) : (
                         <div className="font-medium">Tutor ID: {offer.tutor_id}</div>
                       )}
-                      <div className="text-sm text-gray-600 mt-1">Price: ${offer.price}</div>
-                      <Badge className={getRequestStatusColor(offer.status)}>
+                      <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                        {offer.tutor_price && (
+                          <div>Tutor receives: <span className="font-semibold text-blue-600">${offer.tutor_price}</span></div>
+                        )}
+                        <div>Student price: <span className="font-semibold text-green-600">${offer.price || '0'}</span></div>
+                      </div>
+                      <Badge className={`mt-2 ${getRequestStatusColor(offer.status)}`}>
                         {offer.status}
                       </Badge>
                     </div>

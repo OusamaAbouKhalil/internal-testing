@@ -275,7 +275,7 @@ export function EnhancedUserDialog({
                         <Label htmlFor="emailVerified" className="text-sm font-medium">
                           Email Verified
                         </Label>
-                        <p className="text-xs text-gray-500">Mark email as verified</p>
+                        <p className="text-xs text-muted-foreground">Mark email as verified</p>
                       </div>
                       <Switch
                         id="emailVerified"
@@ -290,7 +290,7 @@ export function EnhancedUserDialog({
                       <Label htmlFor="isActive" className="text-sm font-medium">
                         Account Active
                       </Label>
-                      <p className="text-xs text-gray-500">Enable/disable account</p>
+                      <p className="text-xs text-muted-foreground">Enable/disable account</p>
                     </div>
                     <Switch
                       id="isActive"
@@ -304,7 +304,7 @@ export function EnhancedUserDialog({
                       <Label htmlFor="sendNotifications" className="text-sm font-medium">
                         Notifications
                       </Label>
-                      <p className="text-xs text-gray-500">Send email notifications</p>
+                      <p className="text-xs text-muted-foreground">Send email notifications</p>
                     </div>
                     <Switch
                       id="sendNotifications"

@@ -251,7 +251,7 @@ export default function ResourcesPage() {
             {faq.title && (
               <CardDescription className="mb-2">{faq.title}</CardDescription>
             )}
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <User className="h-3 w-3" />
                 {faq.user_type}
@@ -292,7 +292,7 @@ export default function ResourcesPage() {
       </CardHeader>
       <CardContent>
         <div 
-          className="text-sm text-gray-700"
+          className="text-sm text-foreground"
           dangerouslySetInnerHTML={{ __html: faq.answer }}
         />
       </CardContent>
@@ -311,7 +311,7 @@ export default function ResourcesPage() {
             <CardDescription className="mb-2">
               Code: {language.language_code}
             </CardDescription>
-            <div className="flex items-center gap-1 text-sm text-gray-500">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Calendar className="h-3 w-3" />
               {new Date(language.created_at).toLocaleDateString()}
             </div>
@@ -358,7 +358,7 @@ export default function ResourcesPage() {
                 {social.link}
               </a>
             </CardDescription>
-            <div className="flex items-center gap-1 text-sm text-gray-500">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Calendar className="h-3 w-3" />
               {new Date(social.created_at).toLocaleDateString()}
             </div>
@@ -391,12 +391,12 @@ export default function ResourcesPage() {
         {/* File Attachment */}
         {social.file && (
           <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
-            <File className="h-4 w-4 text-gray-500" />
+            <File className="h-4 w-4 text-muted-foreground" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {social.file.split('/').pop() || 'Attached file'}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {social.file.startsWith('http') ? 'External file' : 'Uploaded file'}
               </p>
             </div>
@@ -481,7 +481,7 @@ export default function ResourcesPage() {
             <CardDescription className="mb-2">
               Subject ID: {subSubject.subject_id}
             </CardDescription>
-            <div className="flex items-center gap-1 text-sm text-gray-500">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Calendar className="h-3 w-3" />
               {new Date(subSubject.created_at).toLocaleDateString()}
             </div>
@@ -525,7 +525,7 @@ export default function ResourcesPage() {
             <CardDescription className="mb-2">
               Icon: {subject.icon} | Version: {subject.version}
             </CardDescription>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <span className={`px-2 py-1 rounded text-xs ${subject.cancelled === '1' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
                 {subject.cancelled === '1' ? 'Cancelled' : 'Active'}
               </span>
@@ -574,8 +574,8 @@ export default function ResourcesPage() {
           <CardContent className="p-6">
             <div className="text-center">
               {getTabIcon(activeTab)}
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No {getTabLabel(activeTab).toLowerCase()} found</h3>
-              <p className="text-gray-500 mb-4">
+              <h3 className="text-lg font-medium text-foreground mb-2">No {getTabLabel(activeTab).toLowerCase()} found</h3>
+              <p className="text-muted-foreground mb-4">
                 {searchTerm 
                   ? `No ${getTabLabel(activeTab).toLowerCase()} match your search criteria.` 
                   : `${getTabLabel(activeTab)} will appear here once they are added to the system.`
@@ -615,8 +615,8 @@ export default function ResourcesPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Resources</h1>
-            <p className="text-gray-600 mt-2">Manage FAQs, languages, socials, subjects, and sub-subjects</p>
+            <h1 className="text-3xl font-bold text-foreground">Resources</h1>
+            <p className="text-muted-foreground mt-2">Manage FAQs, languages, socials, subjects, and sub-subjects</p>
           </div>
         
           {hasPermission('resources', 'write') && (
@@ -633,7 +633,7 @@ export default function ResourcesPage() {
         {/* Search and Filters */}
         <div className="flex items-center space-x-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder={`Search ${getTabLabel(activeTab).toLowerCase()}...`}
               value={searchTerm}
@@ -1006,12 +1006,12 @@ function ResourceForm({ activeTab, selectedItem, onSubmit, loading, onCancel }: 
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{subject.label}</span>
-                      <span className="text-sm text-gray-500">ID: {subject.id}</span>
+                      <span className="text-sm text-muted-foreground">ID: {subject.id}</span>
                     </div>
                   </button>
                 ))
               ) : (
-                <div className="px-4 py-2 text-gray-500 text-sm">
+                <div className="px-4 py-2 text-muted-foreground text-sm">
                   No subjects found
                 </div>
               )}

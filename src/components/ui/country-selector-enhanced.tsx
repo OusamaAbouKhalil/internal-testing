@@ -107,12 +107,12 @@ export function CountrySelectorEnhanced({
                       }}
                     />
                     <span>{country.label}</span>
-                    <span className="text-xs text-gray-500">({country.countryCode})</span>
+                    <span className="text-xs text-muted-foreground">({country.countryCode})</span>
                   </div>
                 </SelectItem>
               ))
             ) : (
-              <div className="p-4 text-center text-sm text-gray-500">
+              <div className="p-4 text-center text-sm text-muted-foreground">
                 No countries found
               </div>
             )}

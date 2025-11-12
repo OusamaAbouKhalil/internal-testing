@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { calculateTutorOfferPrice } from '@/lib/pricing-utils';
 
 export async function GET(
   request: NextRequest,
@@ -39,35 +40,78 @@ export async function POST(
     const { id } = await params;
     const requestId = id;
     const body = await request.json();
-    const { tutorId, price } = body;
+    // Accept either tutor_price (preferred) or price (legacy)
+    const { tutorId, tutor_price, price } = body;
     
-    if (!tutorId || !price) {
+    if (!tutorId) {
       return NextResponse.json(
-        { error: 'Tutor ID and price are required' },
+        { error: 'Tutor ID is required' },
         { status: 400 }
       );
     }
-
+    
+    // Use tutor_price if provided, otherwise fall back to price (legacy)
+    const tutorPriceValue = tutor_price || price;
+    if (!tutorPriceValue) {
+      return NextResponse.json(
+        { error: 'Tutor price is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Get request document to get country for price calculation
+    const requestDoc = await adminDb.collection('requests').doc(requestId).get();
+    if (!requestDoc.exists) {
+      return NextResponse.json(
+        { error: 'Request not found' },
+        { status: 404 }
+      );
+    }
+    
+    const requestData = requestDoc.data();
+    const country = requestData?.country || null;
+    
+    // Calculate price (tutor_price × multiplier)
+    const calculatedPrice = calculateTutorOfferPrice(tutorPriceValue, country);
+    
     const now = new Date();
     
     const newOffer = {
       tutor_id: tutorId,
-      price: price,
+      tutor_price: tutorPriceValue, // What tutor will receive
+      price: calculatedPrice, // Calculated price (tutor_price × multiplier)
       request_id: requestId,
-      status: 'PENDING',
+      status: 'pending',
       cancel_reason: null,
       created_at: now,
       updated_at: now
     };
     
-    const docRef = await adminDb
+    // Use tutor_id as the document ID (not auto-generated)
+    const tutorOfferRef = adminDb
       .collection('requests')
       .doc(requestId)
       .collection('tutor_offers')
-      .add(newOffer);
+      .doc(tutorId);
+    
+    // Check if offer already exists
+    const existingOffer = await tutorOfferRef.get();
+    
+    if (existingOffer.exists) {
+      // Update existing offer
+      await tutorOfferRef.update({
+        tutor_price: tutorPriceValue,
+        price: calculatedPrice,
+        status: 'pending',
+        updated_at: now
+      });
+    } else {
+      // Create new offer with tutor_id as document ID
+      await tutorOfferRef.set(newOffer);
+    }
     
     return NextResponse.json({ 
-      id: docRef.id,
+      id: tutorId, // Return tutor_id as the document ID
       message: 'Tutor offer created successfully' 
     });
   } catch (error: any) {

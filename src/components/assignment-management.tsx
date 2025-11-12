@@ -8,12 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Request } from '@/types/request';
 import { Tutor } from '@/types/tutor';
-import { UserPlus, DollarSign } from 'lucide-react';
+import { UserPlus, AlertCircle } from 'lucide-react';
+import { calculateStudentPrice, calculateTutorOfferPrice, getEffectiveStudentPrice } from '@/lib/pricing-utils';
 
 interface AssignmentManagementProps {
   request: Request;
-  onAssignTutor: (tutorId: string, tutorPrice: string) => void;
-  onSetPrices: (tutorPrice?: string, studentPrice?: string) => void;
+  onAssignTutor: (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => void;
   loading: boolean;
 }
 
@@ -135,9 +135,9 @@ function TutorSearchComponent({
                 </Badge>
               </div>
               <div className="font-medium mt-1">{currentTutor.full_name}</div>
-              <div className="text-sm text-gray-600">{currentTutor.email}</div>
+              <div className="text-sm text-muted-foreground">{currentTutor.email}</div>
               {currentTutor.country && (
-                <div className="text-xs text-gray-500">{currentTutor.country}</div>
+                <div className="text-xs text-muted-foreground">{currentTutor.country}</div>
               )}
             </div>
             <Badge variant={currentTutor.verified === '2' ? 'default' : 'secondary'}>
@@ -151,7 +151,7 @@ function TutorSearchComponent({
         <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
           <div className="flex items-center gap-2">
             <LoadingSpinner />
-            <span className="text-sm text-gray-600">Loading current tutor...</span>
+            <span className="text-sm text-muted-foreground">Loading current tutor...</span>
           </div>
         </div>
       )}
@@ -176,9 +176,9 @@ function TutorSearchComponent({
                       </Badge>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">{tutor.email}</div>
+                  <div className="text-sm text-muted-foreground">{tutor.email}</div>
                   {tutor.country && (
-                    <div className="text-xs text-gray-500">{tutor.country}</div>
+                    <div className="text-xs text-muted-foreground">{tutor.country}</div>
                   )}
                 </div>
                 <Badge variant={tutor.verified === '2' ? 'default' : 'secondary'}>
@@ -192,7 +192,7 @@ function TutorSearchComponent({
 
       {showResults && searchResults.length === 0 && searchTerm.length >= 3 && !isSearching && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-          <div className="text-sm text-gray-500">No tutors found with that email</div>
+          <div className="text-sm text-muted-foreground">No tutors found with that email</div>
         </div>
       )}
     </div>
@@ -202,20 +202,71 @@ function TutorSearchComponent({
 export function AssignmentManagement({ 
   request, 
   onAssignTutor, 
-  onSetPrices, 
   loading 
 }: AssignmentManagementProps) {
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const [tutorPrice, setTutorPrice] = useState(request.tutor_price || '');
   const [studentPrice, setStudentPrice] = useState(request.student_price || '');
+  const [minPrice, setMinPrice] = useState(request.min_price || '');
+
+  // Calculate effective student price for display
+  const effectivePrice = getEffectiveStudentPrice({
+    student_price: studentPrice || request.student_price,
+    tutor_price: tutorPrice || request.tutor_price,
+    country: request.country,
+    min_price: minPrice || request.min_price
+  });
+
+  // Calculate preview price when tutor price changes
+  const previewPrice = tutorPrice 
+    ? calculateStudentPrice({
+        student_price: studentPrice || null, // Use manual override if set
+        tutor_price: tutorPrice,
+        country: request.country,
+        min_price: minPrice || request.min_price || null
+      })
+    : effectivePrice.price;
 
   const handleTutorSelect = (tutor: Tutor) => {
     setSelectedTutor(tutor);
   };
 
-  const handleAssignTutor = () => {
+  const handleUpdatePrices = () => {
     if (selectedTutor && tutorPrice) {
-      onAssignTutor(selectedTutor.id, tutorPrice);
+      // Calculate student_price when assigning tutor (if not manually overridden)
+      const calculatedStudentPrice = studentPrice 
+        ? studentPrice 
+        : calculateStudentPrice({
+            student_price: null,
+            tutor_price: tutorPrice,
+            country: request.country,
+            min_price: minPrice || null
+          });
+      
+      // Pass tutor_price, student_price, and min_price all at once
+      onAssignTutor(
+        selectedTutor.id, 
+        tutorPrice, 
+        calculatedStudentPrice || undefined,
+        minPrice || undefined
+      );
+    } else if (tutorPrice) {
+      // If no tutor selected, just update prices for existing tutor
+      const calculatedStudentPrice = studentPrice 
+        ? studentPrice 
+        : calculateStudentPrice({
+            student_price: null,
+            tutor_price: tutorPrice,
+            country: request.country,
+            min_price: minPrice || null
+          });
+      
+      onAssignTutor(
+        request.tutor_id || '', 
+        tutorPrice, 
+        calculatedStudentPrice || undefined,
+        minPrice || undefined
+      );
     }
   };
 
@@ -233,9 +284,9 @@ export function AssignmentManagement({
             <div className="flex justify-between items-start">
               <div>
                 <div className="font-medium">{selectedTutor.full_name}</div>
-                <div className="text-sm text-gray-600">{selectedTutor.email}</div>
+                <div className="text-sm text-muted-foreground">{selectedTutor.email}</div>
                 {selectedTutor.country && (
-                  <div className="text-xs text-gray-500">{selectedTutor.country}</div>
+                  <div className="text-xs text-muted-foreground">{selectedTutor.country}</div>
                 )}
               </div>
               <Badge variant={selectedTutor.verified === '2' ? 'default' : 'secondary'}>
@@ -245,40 +296,88 @@ export function AssignmentManagement({
           </div>
         )}
         
-        <div className="flex gap-2">
-          <Input
-            placeholder="Tutor Price"
-            value={tutorPrice}
-            onChange={(e) => setTutorPrice(e.target.value)}
-            type="number"
-          />
-          <Button
-            onClick={handleAssignTutor}
-            disabled={loading || !selectedTutor || !tutorPrice}
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Assign Tutor
-          </Button>
+        <div className="space-y-4 border-t pt-4">
+          <div className="space-y-2">
+            <Label>Tutor Price (What tutor receives)</Label>
+            <Input
+              placeholder="Enter tutor price..."
+              value={tutorPrice}
+              onChange={(e) => setTutorPrice(e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+            />
+            {tutorPrice && (
+              <div className="text-sm text-muted-foreground">
+                Calculated student price: <span className="font-semibold text-green-600">${previewPrice}</span>
+                {request.country && (
+                  <span className="ml-2 text-xs">
+                    (Multiplier: {request.country.toUpperCase() === 'LEBANON' ? '×2' : '×3'})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Student Price (Optional - Leave empty for auto-calculation)</Label>
+            <Input
+              placeholder="Leave empty for auto-calculation"
+              value={studentPrice}
+              onChange={(e) => setStudentPrice(e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Setting this will override all calculations. Leave empty to use calculated price.
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Minimum Price (Optional)</Label>
+            <Input
+              placeholder="Enter minimum price..."
+              value={minPrice}
+              onChange={(e) => setMinPrice(e.target.value)}
+              type="number"
+              step="0.01"
+              min="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum price that will be enforced for student price calculation.
+            </p>
+          </div>
+          
+          <div>
+            <Label className="text-sm text-muted-foreground">Current Effective Student Price</Label>
+            <div className="p-2 bg-gray-50 rounded-md">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-lg">${effectivePrice.price}</span>
+                {effectivePrice.isOverride && (
+                  <Badge variant="outline" className="text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Override
+                  </Badge>
+                )}
+                {effectivePrice.isCalculated && (
+                  <Badge variant="secondary" className="text-xs">
+                    Calculated
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-      
-      <div className="space-y-2">
-        <Label>Price Management</Label>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Student Price"
-            value={studentPrice}
-            onChange={(e) => setStudentPrice(e.target.value)}
-            type="number"
-          />
-          <Button
-            onClick={() => onSetPrices(tutorPrice, studentPrice)}
-            disabled={loading}
-          >
-            <DollarSign className="h-4 w-4 mr-2" />
-            Update Prices
-          </Button>
-        </div>
+        
+        <Button
+          onClick={handleUpdatePrices}
+          disabled={loading || (!selectedTutor && !request.tutor_id) || !tutorPrice}
+          className="w-full"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          {selectedTutor || request.tutor_id ? 'Update Prices & Assign Tutor' : 'Update Prices'}
+        </Button>
       </div>
     </div>
   );

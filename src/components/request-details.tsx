@@ -12,6 +12,7 @@ import { getRequestTypeLabel } from '@/types/request';
 import { useRequestManagementStore } from '@/stores/request-management-store';
 import { combineDateAndTime, formatDateWithTimezone } from '@/lib/date-utils';
 import { format } from 'date-fns';
+import { Star } from 'lucide-react';
 
 interface RequestDetailsProps {
   request: Request;
@@ -143,28 +144,28 @@ export function RequestDetails({ request }: RequestDetailsProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Title</Label>
-          <div className="p-2 bg-gray-50 rounded">{request.label}</div>
+          <div className="p-2 bg-muted rounded">{request.label}</div>
         </div>
         <div className="space-y-2">
           <Label>Type</Label>
-          <div className="p-2 bg-gray-50 rounded">{getRequestTypeLabel(request.assistance_type)}</div>
+          <div className="p-2 bg-muted rounded">{getRequestTypeLabel(request.assistance_type)}</div>
         </div>
         <div className="space-y-2">
           <Label>Subject</Label>
-          <div className="p-2 bg-gray-50 rounded">{request.subject}</div>
+          <div className="p-2 bg-muted rounded">{request.subject}</div>
         </div>
         <div className="space-y-2">
           <Label>Language</Label>
-          <div className="p-2 bg-gray-50 rounded">{request.language}</div>
+          <div className="p-2 bg-muted rounded">{request.language}</div>
         </div>
         <div className="space-y-2">
           <Label>Country</Label>
-          <div className="p-2 bg-gray-50 rounded">{request.country}</div>
+          <div className="p-2 bg-muted rounded">{request.country}</div>
         </div>
 
         <div className="space-y-2">
           <Label>Student</Label>
-          <div className="p-2 bg-gray-50 rounded">
+          <div className="p-2 bg-muted rounded">
             {loadingStudent ? (
               <div className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
@@ -173,7 +174,7 @@ export function RequestDetails({ request }: RequestDetailsProps) {
             ) : studentInfo ? (
               <div>
                 <div className="font-medium">{studentInfo.nickname}</div>
-                <div className="text-sm text-gray-500">{studentInfo.email}</div>
+                <div className="text-sm text-muted-foreground">{studentInfo.email}</div>
               </div>
             ) : (
               'Not assigned'
@@ -182,7 +183,7 @@ export function RequestDetails({ request }: RequestDetailsProps) {
         </div>
         <div className="space-y-2">
           <Label>Tutor</Label>
-          <div className="p-2 bg-gray-50 rounded">
+          <div className="p-2 bg-muted rounded">
             {loadingTutor ? (
               <div className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
@@ -191,7 +192,7 @@ export function RequestDetails({ request }: RequestDetailsProps) {
             ) : tutorInfo ? (
               <div>
                 <div className="font-medium">{tutorInfo.nickname}</div>
-                <div className="text-sm text-gray-500">{tutorInfo.email}</div>
+                <div className="text-sm text-muted-foreground">{tutorInfo.email}</div>
               </div>
             ) : (
               'Not assigned'
@@ -200,11 +201,11 @@ export function RequestDetails({ request }: RequestDetailsProps) {
         </div>
         <div className="space-y-2">
           <Label>Created At</Label>
-          <div className="p-2 bg-gray-50 rounded">{formatDate(request.created_at)}</div>
+          <div className="p-2 bg-muted rounded">{formatDate(request.created_at)}</div>
         </div>
         <div className="space-y-2">
           <Label>Deadline</Label>
-          <div className="p-2 bg-gray-50 rounded">
+          <div className="p-2 bg-muted rounded">
             {request.timezone ? (
               <>
                 <div>
@@ -233,7 +234,7 @@ export function RequestDetails({ request }: RequestDetailsProps) {
         </div>
         <div className="space-y-2">
           <Label>Updated At</Label>
-          <div className="p-2 bg-gray-50 rounded">{formatDate(request.updated_at)}</div>
+          <div className="p-2 bg-muted rounded">{formatDate(request.updated_at)}</div>
         </div>
       </div>
 
@@ -291,8 +292,59 @@ export function RequestDetails({ request }: RequestDetailsProps) {
       {/* Description */}
       <div className="space-y-2">
         <Label>Description</Label>
-        <div className="p-2 bg-gray-50 rounded min-h-[100px]">
+        <div className="p-2 bg-muted rounded min-h-[100px]">
           {request.description || 'No description'}
+        </div>
+      </div>
+
+      {/* Rating & Feedback */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Rating</Label>
+          {(() => {
+            const ratingNumber = (() => {
+              if (!request.rating || request.rating === '') return 0;
+              const n = Math.round(parseFloat(request.rating));
+              if (isNaN(n)) return 0;
+              return Math.min(5, Math.max(0, n));
+            })();
+
+            const bgClass = ratingNumber >= 4
+              ? 'bg-green-50 border-green-200'
+              : ratingNumber >= 3
+              ? 'bg-amber-50 border-amber-200'
+              : ratingNumber >= 1
+              ? 'bg-red-50 border-red-200'
+              : 'bg-muted';
+
+            return (
+              <div className={`p-2 rounded border ${bgClass}`}>
+                {ratingNumber === 0 ? (
+                  <span className="text-muted-foreground">No rating</span>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const filled = idx < ratingNumber;
+                      return (
+                        <Star
+                          key={idx}
+                          className={filled ? 'h-4 w-4 text-yellow-500' : 'h-4 w-4 text-muted-foreground'}
+                          fill={filled ? 'currentColor' : 'none'}
+                          strokeWidth={1.5}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+        <div className="space-y-2">
+          <Label>Feedback</Label>
+          <div className="p-2 bg-muted rounded min-h-[60px]">
+            {request.feedback && request.feedback.trim() !== '' ? request.feedback : 'No feedback'}
+          </div>
         </div>
       </div>
 

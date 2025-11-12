@@ -5,6 +5,7 @@ export interface Tutor {
   version: string;
   send_notifications: string;
   major?: number | null;
+  majorId?: number[] | number | null;
   platform?: string;
   test_user: string;
   deleted_at?: string | null;
@@ -46,7 +47,6 @@ export interface Tutor {
   updated_at: string | { _seconds: number; _nanoseconds: number };
   request_count?: number;
   rating?: number;
-  sign_in_method?: 'manual' | 'facebook' | 'google' | 'apple';
 }
 
 // Enums for tutor attributes
@@ -128,7 +128,13 @@ export interface UpdateTutorData {
 
 export interface TutorFilters {
   search?: string;
+  email?: string;
+  nickname?: string;
+  phone?: string;
+  whatsapp_phone?: string;
   verified?: boolean;
+  cancelled?: boolean;
+  deleted?: boolean;
   country?: string;
   gender?: string;
   has_requests?: boolean;

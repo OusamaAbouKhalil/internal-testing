@@ -32,11 +32,11 @@ export default function AccountSettingsSection({
               <Label htmlFor="verified" className="text-sm font-medium">
                 Verified
               </Label>
-              <p className="text-xs text-gray-500">Account verification status</p>
+              <p className="text-xs text-muted-foreground">Account verification status</p>
             </div>
             <Switch
               id="verified"
-              checked={formData.verified === '2'}
+              checked={formData.verified === '1' || formData.verified === '2'}
               onCheckedChange={(checked) => onFieldChange('verified', checked ? '2' : '0')}
             />
           </div>
@@ -46,7 +46,7 @@ export default function AccountSettingsSection({
               <Label htmlFor="is_banned" className="text-sm font-medium">
                 Banned
               </Label>
-              <p className="text-xs text-gray-500">Restrict account access</p>
+              <p className="text-xs text-muted-foreground">Restrict account access</p>
             </div>
             <Switch
               id="is_banned"
@@ -60,7 +60,7 @@ export default function AccountSettingsSection({
               <Label htmlFor="send_notifications" className="text-sm font-medium">
                 Notifications
               </Label>
-              <p className="text-xs text-gray-500">Send push notifications</p>
+              <p className="text-xs text-muted-foreground">Send push notifications</p>
             </div>
             <Switch
               id="send_notifications"
@@ -74,7 +74,7 @@ export default function AccountSettingsSection({
               <Label htmlFor="locked" className="text-sm font-medium">
                 Locked
               </Label>
-              <p className="text-xs text-gray-500">Temporarily lock account</p>
+              <p className="text-xs text-muted-foreground">Temporarily lock account</p>
             </div>
             <Switch
               id="locked"
@@ -88,7 +88,7 @@ export default function AccountSettingsSection({
               <Label htmlFor="cancelled" className="text-sm font-medium">
                 Cancelled
               </Label>
-              <p className="text-xs text-gray-500">Mark as cancelled</p>
+              <p className="text-xs text-muted-foreground">Mark as cancelled</p>
             </div>
             <Switch
               id="cancelled"

@@ -218,7 +218,7 @@ export function ImageUpload({
             )}
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Or paste image URL:
           </div>
           <Input
@@ -238,7 +238,7 @@ export function ImageUpload({
         )}
 
         {/* Info */}
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted-foreground">
           Max file size: {maxSizeMB}MB. Supported formats: JPG, PNG, GIF, WebP
         </p>
       </div>

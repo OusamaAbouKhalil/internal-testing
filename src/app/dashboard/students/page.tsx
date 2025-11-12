@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingOverlay, LoadingButton } from "@/components/ui/loading-spinner";
 import { StatusBadge, NotificationBadge } from "@/components/ui/status-badge";
 import { EnhancedStudentDialog } from "@/components/enhanced-student-dialog";
+import { PaginationAdvanced } from "@/components/pagination.advanced";
 import { 
   GraduationCap, 
   Plus, 
@@ -31,13 +32,17 @@ import {
   Globe,
   Languages,
   CheckCircle,
-  XCircle
+  XCircle,
+  Copy,
+  Check,
+  Eye
 } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useStudentManagementStore } from "@/stores/student-management-store";
 import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
 import { useResourcesManagementStore } from "@/stores/resources-management-store";
-import { Student, StudentFilters } from "@/types/student";
+import { Student, StudentFilters, StudentEducationLevelEnum, StudentEducationLevelLabel } from "@/types/student";
 import { getStudentProfileImageUrl } from "@/lib/file-upload";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -45,17 +50,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [emailTerm, setEmailTerm] = useState("");
+  const [nicknameTerm, setNicknameTerm] = useState("");
+  const [phoneTerm, setPhoneTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [debouncedEmailTerm, setDebouncedEmailTerm] = useState("");
+  const [debouncedNicknameTerm, setDebouncedNicknameTerm] = useState("");
+  const [debouncedPhoneTerm, setDebouncedPhoneTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<StudentFilters>({});
+  const [activeTab, setActiveTab] = useState<'all' | 'verified' | 'not_verified' | 'deleted' | 'banned'>('all');
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState({
-    studentLevels: new Set<string>(),
-    majors: new Set<string>(),
     countries: new Set<string>(),
     nationalities: new Set<string>()
   });
@@ -65,14 +77,19 @@ export default function StudentsPage() {
     loading, 
     error, 
     totalCount,
+    totalPages,
     hasMore,
+    currentPage,
+    perPage,
     fetchStudents, 
     createStudent, 
     updateStudent, 
     deleteStudent,
     toggleVerification,
     importStudents,
-    resetPagination
+    resetPagination,
+    setCurrentPage,
+    setPerPage
   } = useStudentManagementStore();
 
   const { hasPermission } = useFirebaseAuthStore();
@@ -84,6 +101,63 @@ export default function StudentsPage() {
     fetchLanguages();
     fetchSubjects();
   }, []);
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (newPage === currentPage) return;
+    setCurrentPage(newPage);
+    fetchStudents(filters, newPage);
+  };
+
+  // Handle per page change
+  const handlePerPageChange = (newPerPage: number) => {
+    setPerPage(newPerPage);
+    const searchFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters
+    };
+    resetPagination();
+    fetchStudents(searchFilters, 1, 'first');
+  };
+
+  // Debounce search term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Debounce email term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedEmailTerm(emailTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [emailTerm]);
+
+  // Debounce nickname term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNicknameTerm(nicknameTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [nicknameTerm]);
+
+  // Debounce phone term (500ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhoneTerm(phoneTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [phoneTerm]);
 
   // Helper function to get language names for a student
   const getStudentLanguages = useCallback((student: Student) => {
@@ -107,19 +181,11 @@ export default function StudentsPage() {
   useEffect(() => {
     if (students.length > 0) {
       const newFilterOptions = {
-        studentLevels: new Set<string>(),
-        majors: new Set<string>(),
         countries: new Set<string>(),
         nationalities: new Set<string>()
       };
 
       students.forEach(student => {
-        if (student.student_level) {
-          newFilterOptions.studentLevels.add(student.student_level);
-        }
-        if (student.majorId) {
-          newFilterOptions.majors.add(student.majorId.toString());
-        }
         if (student.country) {
           newFilterOptions.countries.add(student.country);
         }
@@ -134,33 +200,92 @@ export default function StudentsPage() {
 
   useEffect(() => {
     const searchFilters: StudentFilters = {
-      search: searchTerm || undefined,
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
       ...filters
     };
     resetPagination();
-    fetchStudents(searchFilters);
-  }, [searchTerm, filters]);
+    fetchStudents(searchFilters, 1, 'first');
+  }, [debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, filters]);
+
+  const handleTabChange = (tab: 'all' | 'verified' | 'not_verified' | 'deleted' | 'banned') => {
+    setActiveTab(tab);
+    // Reset related filters, then set tab-specific ones
+    const base = { ...filters, verified: undefined, deleted: undefined, is_banned: undefined } as StudentFilters;
+    if (tab === 'verified') setFilters({ ...base, verified: '1' });
+    else if (tab === 'not_verified') setFilters({ ...base, verified: '0' });
+    else if (tab === 'deleted') setFilters({ ...base, deleted: true });
+    else if (tab === 'banned') setFilters({ ...base, is_banned: '1' });
+    else setFilters(base);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({});
+    setSearchTerm('');
+    setEmailTerm('');
+    setNicknameTerm('');
+    setPhoneTerm('');
+    setDebouncedSearchTerm('');
+    setDebouncedEmailTerm('');
+    setDebouncedNicknameTerm('');
+    setDebouncedPhoneTerm('');
+    setActiveTab('all');
+  };
 
   const handleCreateStudent = useCallback(async (studentData: any) => {
     await createStudent(studentData);
-  }, [createStudent]);
+    const currentFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchStudents(currentFilters, currentPage);
+  }, [createStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleUpdateStudent = useCallback(async (studentData: any) => {
     if (!selectedStudent) return;
     await updateStudent(selectedStudent.id, studentData);
-  }, [selectedStudent, updateStudent]);
+    const currentFilters: StudentFilters = {
+      search: debouncedSearchTerm || undefined,
+      email: debouncedEmailTerm || undefined,
+      nickname: debouncedNicknameTerm || undefined,
+      phone_number: debouncedPhoneTerm || undefined,
+      ...filters,
+    };
+    fetchStudents(currentFilters, currentPage);
+  }, [selectedStudent, updateStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleDeleteStudent = useCallback(async (studentId: string) => {
     if (confirm('Are you sure you want to delete this student?')) {
       await deleteStudent(studentId);
+      const currentFilters: StudentFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone_number: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchStudents(currentFilters, currentPage);
     }
-  }, [deleteStudent]);
+  }, [deleteStudent, fetchStudents, filters, debouncedSearchTerm, debouncedEmailTerm, debouncedNicknameTerm, debouncedPhoneTerm, currentPage]);
 
   const handleToggleVerification = async (studentId: string, currentStatus: string) => {
     try {
       setActionLoading(studentId + '_verify');
       const newStatus = currentStatus === '1' ? false : true;
       await toggleVerification(studentId, newStatus);
+      const currentFilters: StudentFilters = {
+        search: debouncedSearchTerm || undefined,
+        email: debouncedEmailTerm || undefined,
+        nickname: debouncedNicknameTerm || undefined,
+        phone_number: debouncedPhoneTerm || undefined,
+        ...filters,
+      };
+      fetchStudents(currentFilters, currentPage);
     } catch (error) {
       console.error('Failed to toggle verification:', error);
     } finally {
@@ -179,10 +304,6 @@ export default function StudentsPage() {
     setSelectedStudent(student);
     setIsEditDialogOpen(true);
   }, []);
-
-  const handleLoadMore = () => {
-    fetchStudents(filters, true);
-  };
 
   const handleImportStudents = async () => {
     try {
@@ -233,9 +354,9 @@ export default function StudentsPage() {
       case 'google':
         return <Globe className="h-4 w-4 text-red-500" />;
       case 'apple':
-        return <Apple className="h-4 w-4 text-gray-800" />;
+        return <Apple className="h-4 w-4 text-foreground" />;
       default:
-        return <User className="h-4 w-4 text-gray-600" />;
+        return <User className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -252,277 +373,188 @@ export default function StudentsPage() {
     }
   };
 
+  const handleCopyId = async (studentId: string) => {
+    try {
+      await navigator.clipboard.writeText(studentId);
+      setCopiedId(studentId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
   return (
     <AuthGuard requiredPermission={{ resource: 'students', action: 'read' }}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Students</h1>
-            <p className="text-gray-600 mt-2">Manage student accounts and information</p>
-            <p className="text-sm text-gray-500 mt-1">Total: {totalCount} students</p>
+            <h1 className="text-3xl font-bold">Students</h1>
+            <p className="text-muted-foreground mt-2">Manage student accounts and information</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {students.length > 0 ? (
+                <>Showing {students.length} of {totalCount} student{totalCount !== 1 ? 's' : ''}</>
+              ) : (
+                <>Total: {totalCount} student{totalCount !== 1 ? 's' : ''}</>
+              )}
+              {(filters.created_at_from || filters.created_at_to) && (
+                <span className="ml-2 text-green-600 font-medium">
+                  • {totalCount} student{totalCount !== 1 ? 's' : ''} in date range
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
+           
             
-            {hasPermission('students', 'write') && (
-              <>
-                <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Import
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Import Students</DialogTitle>
-                      <DialogDescription>
-                        Import students from the JSON file.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        This will import all students from the students.json file.
-                      </p>
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleImportStudents} disabled={loading}>
-                          Import Students
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <LoadingButton
-                  onClick={openCreateDialog}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Student
-                </LoadingButton>
-              </>
-            )}
           </div>
         </div>
 
         {/* Search and Filters */}
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Search by name, email, phone, major, country, requests, sign-in method, spend amount, etc..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>Filters</CardTitle>
+              {(searchTerm || emailTerm || nicknameTerm || phoneTerm || filters.created_at_from || filters.created_at_to || Object.keys(filters).length > 0 || activeTab !== 'all') && (
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>
+                  Clear Filters
+                </Button>
+              )}
             </div>
-            <Button variant="outline" onClick={() => setShowFilters((v) => !v)} className="whitespace-nowrap">
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
-          </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Status Tabs */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'verified', label: 'Verified' },
+                  { key: 'not_verified', label: 'Not Verified' },
+                  { key: 'deleted', label: 'Deleted' },
+                  { key: 'banned', label: 'Banned' },
+                ].map((tab) => (
+                  <Button
+                    key={tab.key}
+                    variant={activeTab === (tab.key as any) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleTabChange(tab.key as any)}
+                    className="whitespace-nowrap"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-          {showFilters && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Filters</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Verification Status</Label>
-                    <Select
-                      value={filters.verified?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, verified: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="true">Verified</SelectItem>
-                        <SelectItem value="false">Not Verified</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Ban Status</Label>
-                    <Select
-                      value={filters.is_banned?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, is_banned: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="false">Active</SelectItem>
-                        <SelectItem value="true">Banned</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Student Level</Label>
-                    <Select
-                      value={filters.student_level || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, student_level: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Levels" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Levels</SelectItem>
-                        {Array.from(filterOptions.studentLevels).sort((a, b) => a.localeCompare(b)).map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {level}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Major</Label>
-                    <Select
-                      value={filters.majorId?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, majorId: value === 'all' ? undefined : parseInt(value) })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Majors" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Majors</SelectItem>
-                        {Array.from(filterOptions.majors).sort((a, b) => parseInt(a) - parseInt(b)).map((majorId) => {
-                          const majorName = getMajorName(parseInt(majorId));
-                          return (
-                            <SelectItem key={majorId} value={majorId}>
-                              {majorName || `Major ID: ${majorId}`}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Country</Label>
-                    <Select
-                      value={filters.country || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, country: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Countries" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Countries</SelectItem>
-                        {Array.from(filterOptions.countries).sort((a, b) => a.localeCompare(b)).map((country) => (
-                          <SelectItem key={country} value={country}>
-                            {country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Nationality</Label>
-                    <Select
-                      value={filters.nationality || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, nationality: value === 'all' ? undefined : value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="All Nationalities" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Nationalities</SelectItem>
-                        {Array.from(filterOptions.nationalities).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })).map((nationality) => (
-                          <SelectItem key={nationality} value={nationality}>
-                            {nationality}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label>Has Requests</Label>
-                    <Select
-                      value={filters.has_requests?.toString() || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, has_requests: value === 'all' ? undefined : value === 'true' })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="true">With Requests</SelectItem>
-                        <SelectItem value="false">No Requests</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Sign-in Method</Label>
-                    <Select
-                      value={filters.sign_in_method || undefined}
-                      onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="facebook">Facebook</SelectItem>
-                        <SelectItem value="google">Google</SelectItem>
-                        <SelectItem value="apple">Apple</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Min Spend Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={filters.min_spend || ''}
-                      onChange={(e) => setFilters({ ...filters, min_spend: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label className="text-sm font-medium">Max Spend Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="1000.00"
-                      value={filters.max_spend || ''}
-                      onChange={(e) => setFilters({ ...filters, max_spend: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    />
-                  </div>
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by name, country, etc..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by email..."
+                    value={emailTerm}
+                    onChange={(e) => setEmailTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search by phone..."
+                    value={phoneTerm}
+                    onChange={(e) => setPhoneTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative flex-1 flex items-center gap-2">
+                  <Label className="text-sm font-medium whitespace-nowrap mr-2">Sign-in Method</Label>
+                  <Select
+                    value={filters.sign_in_method || "all"}
+                    onValueChange={(value) => setFilters({ ...filters, sign_in_method: value === 'all' ? undefined : value as any })}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="facebook">Facebook</SelectItem>
+                      <SelectItem value="google">Google</SelectItem>
+                      <SelectItem value="apple">Apple</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Date Range Filters */}
+              <div className="flex flex-col md:flex-row md:items-center gap-2 pt-2 border-t">
+                <div className="flex items-center gap-2 flex-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium whitespace-nowrap">Created From:</Label>
+                  <Input
+                    type="date"
+                    value={filters.created_at_from || ''}
+                    onChange={(e) => setFilters({ ...filters, created_at_from: e.target.value || undefined })}
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-medium whitespace-nowrap">Created To:</Label>
+                  <Input
+                    type="date"
+                    value={filters.created_at_to || ''}
+                    onChange={(e) => setFilters({ ...filters, created_at_to: e.target.value || undefined })}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
+        )}
+
+        {/* Pagination Controls - Top */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {students.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
+          </div>
         )}
 
         {/* Students Grid */}
@@ -534,7 +566,7 @@ export default function StudentsPage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-muted flex items-center justify-center">
                           <img 
                             src={getStudentProfileImageUrl(student)} 
                             alt={student.full_name || 'Student'} 
@@ -559,12 +591,31 @@ export default function StudentsPage() {
                             {student.full_name || 'No Name'}
                           </CardTitle>
                           {student.nickname && student.nickname !== student.full_name && (
-                            <p className="text-sm text-gray-600 mb-1 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1">
                               <UserCircle className="h-3 w-3" />
                               @{student.nickname}
                             </p>
                           )}
-                          <CardDescription className="flex items-center gap-4 mt-1">
+                          <CardDescription className="flex items-center gap-4 mt-1 text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <span className="text-xs font-medium">ID:</span>
+                              <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                                {student.id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 hover:bg-muted"
+                                onClick={() => handleCopyId(student.id)}
+                                title={copiedId === student.id ? 'Copied!' : 'Copy ID'}
+                              >
+                                {copiedId === student.id ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </span>
                             <span className="flex items-center gap-1">
                               <Mail className="h-4 w-4" />
                               {student.email}
@@ -586,6 +637,18 @@ export default function StudentsPage() {
                     </div>
                     
                     <div className="flex gap-2">
+                      {/* View Button */}
+                      <Link href={`/dashboard/students/${student.id}`}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600"
+                          title="View student details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+
                       {hasPermission('students', 'write') && (
                         <>
                           {/* Verification Toggle */}
@@ -597,7 +660,7 @@ export default function StudentsPage() {
                             className={
                               student.verified === '1'
                                 ? "hover:bg-green-50 hover:border-green-200 text-green-600 border-green-300"
-                                : "hover:bg-gray-50 hover:border-gray-200"
+                                : "hover:bg-muted"
                             }
                             title={student.verified === '1' ? 'Unverify student' : 'Verify student'}
                           >
@@ -642,7 +705,7 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
                   {student.student_level && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <BookOpen className="h-3 w-3" />
                         Level
                       </h4>
@@ -652,7 +715,7 @@ export default function StudentsPage() {
                   
                   {(student.majorId || student.otherMajor) && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <GraduationCap className="h-3 w-3" />
                         Major
                       </h4>
@@ -664,7 +727,7 @@ export default function StudentsPage() {
                   
                   {student.country && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
                         Location
                       </h4>
@@ -675,7 +738,7 @@ export default function StudentsPage() {
                   )}
                   
                   <div>
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
                       Requests
                     </h4>
@@ -684,7 +747,7 @@ export default function StudentsPage() {
                   
                   {student.spend_amount !== undefined && student.spend_amount > 0 && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
                         Spent
                       </h4>
@@ -696,7 +759,7 @@ export default function StudentsPage() {
                   
                   {student.rating !== undefined && student.rating > 0 && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <Star className="h-3 w-3" />
                         Rating
                       </h4>
@@ -708,7 +771,7 @@ export default function StudentsPage() {
                   
                   {student.nationality && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <User className="h-3 w-3" />
                         Nationality
                       </h4>
@@ -718,7 +781,7 @@ export default function StudentsPage() {
                   
                   {student.gender && (
                     <div>
-                      <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1">
+                      <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1">
                         <UserCircle className="h-3 w-3" />
                         Gender
                       </h4>
@@ -730,7 +793,7 @@ export default function StudentsPage() {
                 {/* Languages Section - Full Width */}
                 {getStudentLanguages(student).length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <h4 className="font-medium text-sm text-gray-600 flex items-center gap-1 mb-2">
+                    <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-1 mb-2">
                       <Languages className="h-3 w-3" />
                       Languages
                     </h4>
@@ -750,13 +813,24 @@ export default function StudentsPage() {
                 
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3 w-3" />
-                      <span>Joined {new Date(student.created_at).toLocaleDateString()}</span>
+                      <span>
+                        Joined{" "}
+                        {typeof student.created_at === "object" && (student?.created_at as any)?._seconds
+                          ? new Date((student?.created_at as any)?._seconds * 1000).toLocaleDateString()
+                          : student?.created_at
+                          ? new Date(student.created_at).toLocaleDateString()
+                          : "Unknown"}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      {getSignInMethodIcon(student.sign_in_method)}
-                      <span>{getSignInMethodLabel(student.sign_in_method)}</span>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      {student?.sign_in_methods?.length && student?.sign_in_methods?.length > 0 && student?.sign_in_methods?.map((method) => (
+                        <div key={method}>
+                          {getSignInMethodIcon(method)}
+                          <span>{getSignInMethodLabel(method)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -766,22 +840,43 @@ export default function StudentsPage() {
           </div>
         </LoadingOverlay>
 
-        {/* Load More Button */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleLoadMore} disabled={loading}>
-              Load More Students
-            </Button>
+        {/* Pagination Controls - Bottom */}
+        {!loading && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="per-page-select-bottom">Show per page:</Label>
+              <Select value={perPage.toString()} onValueChange={(value) => handlePerPageChange(parseInt(value))}>
+                <SelectTrigger id="per-page-select-bottom" className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {students.length > 0 ? ((currentPage - 1) * perPage + 1) : 0} - {Math.min(currentPage * perPage, totalCount)} of {totalCount}
+              </span>
+            </div>
+            {totalPages > 1 && (
+              <PaginationAdvanced 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
           </div>
         )}
 
         {students.length === 0 && !loading && (
-          <Card>
+          <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-6">
               <div className="text-center">
-                <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No students found</h3>
-                <p className="text-gray-500 mb-4">
+                <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No students found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm || Object.keys(filters).length > 0 
                     ? 'No students match your search criteria.' 
                     : 'Students will appear here once they are added to the system.'

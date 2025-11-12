@@ -33,7 +33,7 @@ export default function StudentAccountSettingsSection({
                 <Shield className="h-4 w-4 text-green-600" />
                 Verified
               </Label>
-              <p className="text-xs text-gray-500">Student verification status</p>
+              <p className="text-xs text-muted-foreground">Student verification status</p>
             </div>
             <Switch
               id="verified"
@@ -48,7 +48,7 @@ export default function StudentAccountSettingsSection({
                 <Ban className="h-4 w-4 text-red-600" />
                 Banned
               </Label>
-              <p className="text-xs text-gray-500">Restrict student account access</p>
+              <p className="text-xs text-muted-foreground">Restrict student account access</p>
             </div>
             <Switch
               id="is_banned"
@@ -63,7 +63,7 @@ export default function StudentAccountSettingsSection({
                 <Bell className="h-4 w-4 text-blue-600" />
                 Notifications
               </Label>
-              <p className="text-xs text-gray-500">Send push notifications to student</p>
+              <p className="text-xs text-muted-foreground">Send push notifications to student</p>
             </div>
             <Switch
               id="send_notifications"
@@ -78,7 +78,7 @@ export default function StudentAccountSettingsSection({
                 <Lock className="h-4 w-4 text-orange-600" />
                 Locked
               </Label>
-              <p className="text-xs text-gray-500">Temporarily lock student account</p>
+              <p className="text-xs text-muted-foreground">Temporarily lock student account</p>
             </div>
             <Switch
               id="locked"
@@ -90,10 +90,10 @@ export default function StudentAccountSettingsSection({
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <div>
               <Label htmlFor="cancelled" className="text-sm font-medium flex items-center gap-2">
-                <X className="h-4 w-4 text-gray-600" />
+                <X className="h-4 w-4 text-muted-foreground" />
                 Cancelled
               </Label>
-              <p className="text-xs text-gray-500">Mark student account as cancelled</p>
+              <p className="text-xs text-muted-foreground">Mark student account as cancelled</p>
             </div>
             <Switch
               id="cancelled"

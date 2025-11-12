@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 /**
  * API Route for editing messages
@@ -24,18 +25,8 @@ export async function PUT(
       );
     }
 
-    // Get message
-    const messageDoc = await adminDb.collection('customer_support_chats').doc(messageId).get();
-    
-    if (!messageDoc.exists) {
-      return NextResponse.json(
-        { success: false, error: 'Message not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get room data
-    const roomDoc = await adminDb.collection('customer_support_rooms').doc(room_id).get();
+    // Get room data first to verify it exists
+    const roomDoc = await adminDb.collection('support_rooms').doc(room_id).get();
     
     if (!roomDoc.exists) {
       return NextResponse.json(
@@ -46,16 +37,41 @@ export async function PUT(
 
     const roomData = roomDoc.data();
 
+    // Get message from the subcollection
+    const messageDoc = await adminDb
+      .collection('support_rooms')
+      .doc(room_id)
+      .collection('messages')
+      .doc(messageId)
+      .get();
+    
+    if (!messageDoc.exists) {
+      return NextResponse.json(
+        { success: false, error: 'Message not found' },
+        { status: 404 }
+      );
+    }
+
     // Update message
-    await adminDb.collection('customer_support_chats').doc(messageId).update({
-      message,
-      message_type,
-      updated_at: new Date().toISOString()
-    });
+    await adminDb
+      .collection('support_rooms')
+      .doc(room_id)
+      .collection('messages')
+      .doc(messageId)
+      .update({
+        message,
+        message_type,
+        updated_at: FieldValue.serverTimestamp()
+      });
 
     // Get updated message
-    const updatedMessageDoc = await adminDb.collection('customer_support_chats').doc(messageId).get();
-    const updatedMessage = { id: updatedMessageDoc.id, ...updatedMessageDoc.data() };
+    const updatedMessageDoc = await adminDb
+      .collection('support_rooms')
+      .doc(room_id)
+      .collection('messages')
+      .doc(messageId)
+      .get();
+    const updatedMessage: any = { id: updatedMessageDoc.id, ...updatedMessageDoc.data() };
 
     // Handle Firebase notifications
     if (user_type !== 'admin') {
@@ -65,13 +81,13 @@ export async function PUT(
         body: message,
         room_id,
         message_id: messageId,
-        sender_id: updatedMessage.sender_id,
+        sender_id: updatedMessage?.sender_id,
         user_type,
         type: 'edit_message_support'
       });
     } else {
       // Send notification to student/tutor
-      let targetUser = null;
+      let targetUser: any = null;
       
       if (roomData?.user_type === 'student' && roomData?.user_id) {
         const studentDoc = await adminDb.collection('students').doc(roomData.user_id).get();

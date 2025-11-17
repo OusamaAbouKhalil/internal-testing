@@ -17,7 +17,7 @@ import {
   QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { fetchWithProgress } from '@/lib/api-progress';
-import { calculateStudentPrice, calculateTutorOfferPrice } from '@/lib/pricing-utils';
+// Removed pricing-utils import - no longer using multiplier calculations
 import { db } from '@/config/firebase';
 import { 
   Request, 
@@ -398,27 +398,23 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     try {
       set({ loading: true, error: null });
       
-      const updateData: any = {
-        request_status: status,
-        updated_at: new Date().toISOString()
-      };
-      
-      if (reason) {
-        updateData.cancel_reason = reason;
+      // Call the API route instead of directly updating Firestore
+      const response = await fetch(`/api/requests/${requestId}/actions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'change_status',
+          status: status,
+          reason: reason
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change request status');
       }
-      
-      // Handle specific status changes
-      if (status === 'CANCELLED') {
-        updateData.cancelled = '1';
-        updateData.cancel_reason = reason || 'Cancelled by admin';
-      } else if (status === 'COMPLETED') {
-        updateData.completed = '1';
-        updateData.accepted = '1';
-      } else if (status === 'ONGOING') {
-        updateData.accepted = '1';
-      }
-      
-      await updateDoc(doc(db, 'requests', requestId), updateData);
       
       set({ loading: false, pageCache: new Map() }); // Clear cache
       get().fetchRequests(); // Refresh the list
@@ -689,17 +685,15 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       }
       
       const requestData = requestDoc.data();
-      const country = requestData?.country || null;
-      
-      // Calculate price (tutor_price × multiplier)
-      const calculatedPrice = calculateTutorOfferPrice(tutorPrice, country);
+      // Price should be the same as student_price from request, or tutor_price if student_price doesn't exist
+      const studentPrice = requestData?.student_price || tutorPrice;
       
       const now = new Date().toISOString();
       
       const newOffer = {
         tutor_id: tutorId,
         tutor_price: tutorPrice, // What tutor will receive
-        price: calculatedPrice, // Calculated price (tutor_price × multiplier)
+        price: studentPrice, // Same as student_price
         request_id: requestId,
         status: 'pending',
         cancel_reason: null,
@@ -717,7 +711,7 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         // Update existing offer
         await updateDoc(tutorOfferRef, {
           tutor_price: tutorPrice,
-          price: calculatedPrice,
+          price: studentPrice,
           status: 'pending',
           updated_at: now
         });
@@ -798,27 +792,22 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         throw new Error('Offer data not found');
       }
       
-      // Get request document to access country and min_price for price calculation
+      // Get request document
       const requestDoc = await getDoc(doc(db, 'requests', requestId));
       if (!requestDoc.exists()) {
         throw new Error('Request not found');
       }
       
       const requestData = requestDoc.data();
-      const country = requestData?.country || null;
-      const minPrice = requestData?.min_price || null;
       const currentStudentPrice = requestData?.student_price || null;
       
       // Use tutor_price from offer (what tutor will receive)
       const tutorPrice = offerData.tutor_price || offerData.price; // Fallback to price for legacy offers
       
-      // Calculate student_price based on pricing priority rules
-      const calculatedStudentPrice = calculateStudentPrice({
-        student_price: currentStudentPrice, // Keep override if exists
-        tutor_price: tutorPrice,
-        country: country,
-        min_price: minPrice
-      });
+      // Use existing student_price if it exists, otherwise use tutor_price (no multiplier calculation)
+      const finalStudentPrice = currentStudentPrice && currentStudentPrice !== '' && currentStudentPrice !== '0'
+        ? currentStudentPrice
+        : tutorPrice;
       
       // Update the offer status
       await updateDoc(doc(db, 'requests', requestId, 'tutor_offers', offerId), {
@@ -836,10 +825,8 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
         updated_at: new Date().toISOString()
       };
       
-      // Only update student_price if it's not already an override
-      if (!currentStudentPrice || currentStudentPrice === '0' || currentStudentPrice === '') {
-        updateData.student_price = calculatedStudentPrice;
-      }
+      // Update student_price
+      updateData.student_price = finalStudentPrice;
       
       await updateDoc(doc(db, 'requests', requestId), updateData);
       

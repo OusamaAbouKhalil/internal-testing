@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
-import { calculateStudentPrice } from '@/lib/pricing-utils';
+// Removed pricing-utils import - no longer using multiplier calculations
 
 export async function PUT(
   request: NextRequest,
@@ -103,27 +103,22 @@ async function acceptTutorOffer(requestId: string, offerId: string) {
     throw new Error('Offer data not found');
   }
   
-  // Get request document to access country and min_price for price calculation
+  // Get request document
   const requestDoc = await adminDb.collection('requests').doc(requestId).get();
   if (!requestDoc.exists) {
     throw new Error('Request not found');
   }
   
   const requestData = requestDoc.data();
-  const country = requestData?.country || null;
-  const minPrice = requestData?.min_price || null;
   const currentStudentPrice = requestData?.student_price || null;
   
   // Use tutor_price from offer (what tutor will receive)
   const tutorPrice = offerData.tutor_price || offerData.price; // Fallback to price for legacy offers
   
-  // Calculate student_price based on pricing priority rules
-  const calculatedStudentPrice = calculateStudentPrice({
-    student_price: currentStudentPrice, // Keep override if exists
-    tutor_price: tutorPrice,
-    country: country,
-    min_price: minPrice
-  });
+  // Use existing student_price if it exists, otherwise use tutor_price (no multiplier calculation)
+  const finalStudentPrice = currentStudentPrice && currentStudentPrice !== '' && currentStudentPrice !== '0'
+    ? currentStudentPrice
+    : tutorPrice;
   
   // Update the offer status
   await adminDb
@@ -146,10 +141,8 @@ async function acceptTutorOffer(requestId: string, offerId: string) {
     updated_at: new Date()
   };
   
-  // Only update student_price if it's not already an override
-  if (!currentStudentPrice || currentStudentPrice === '0' || currentStudentPrice === '') {
-    updateData.student_price = calculatedStudentPrice;
-  }
+  // Update student_price
+  updateData.student_price = finalStudentPrice;
   
   await adminDb.collection('requests').doc(requestId).update(updateData);
   

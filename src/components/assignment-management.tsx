@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Request } from '@/types/request';
 import { Tutor } from '@/types/tutor';
 import { UserPlus, AlertCircle } from 'lucide-react';
-import { calculateStudentPrice, calculateTutorOfferPrice, getEffectiveStudentPrice } from '@/lib/pricing-utils';
+// Removed pricing-utils imports - no longer using multiplier calculations
 
 interface AssignmentManagementProps {
   request: Request;
@@ -209,23 +209,8 @@ export function AssignmentManagement({
   const [studentPrice, setStudentPrice] = useState(request.student_price || '');
   const [minPrice, setMinPrice] = useState(request.min_price || '');
 
-  // Calculate effective student price for display
-  const effectivePrice = getEffectiveStudentPrice({
-    student_price: studentPrice || request.student_price,
-    tutor_price: tutorPrice || request.tutor_price,
-    country: request.country,
-    min_price: minPrice || request.min_price
-  });
-
-  // Calculate preview price when tutor price changes
-  const previewPrice = tutorPrice 
-    ? calculateStudentPrice({
-        student_price: studentPrice || null, // Use manual override if set
-        tutor_price: tutorPrice,
-        country: request.country,
-        min_price: minPrice || request.min_price || null
-      })
-    : effectivePrice.price;
+  // Determine effective student price for display (no multiplier calculation)
+  const effectivePrice = studentPrice || request.student_price || tutorPrice || request.tutor_price || '0';
 
   const handleTutorSelect = (tutor: Tutor) => {
     setSelectedTutor(tutor);
@@ -233,38 +218,24 @@ export function AssignmentManagement({
 
   const handleUpdatePrices = () => {
     if (selectedTutor && tutorPrice) {
-      // Calculate student_price when assigning tutor (if not manually overridden)
-      const calculatedStudentPrice = studentPrice 
-        ? studentPrice 
-        : calculateStudentPrice({
-            student_price: null,
-            tutor_price: tutorPrice,
-            country: request.country,
-            min_price: minPrice || null
-          });
+      // Use studentPrice if provided, otherwise use tutorPrice (no multiplier calculation)
+      const finalStudentPrice = studentPrice || tutorPrice;
       
       // Pass tutor_price, student_price, and min_price all at once
       onAssignTutor(
         selectedTutor.id, 
         tutorPrice, 
-        calculatedStudentPrice || undefined,
+        finalStudentPrice || undefined,
         minPrice || undefined
       );
     } else if (tutorPrice) {
       // If no tutor selected, just update prices for existing tutor
-      const calculatedStudentPrice = studentPrice 
-        ? studentPrice 
-        : calculateStudentPrice({
-            student_price: null,
-            tutor_price: tutorPrice,
-            country: request.country,
-            min_price: minPrice || null
-          });
+      const finalStudentPrice = studentPrice || tutorPrice;
       
       onAssignTutor(
         request.tutor_id || '', 
         tutorPrice, 
-        calculatedStudentPrice || undefined,
+        finalStudentPrice || undefined,
         minPrice || undefined
       );
     }
@@ -307,22 +278,12 @@ export function AssignmentManagement({
               step="0.01"
               min="0"
             />
-            {tutorPrice && (
-              <div className="text-sm text-muted-foreground">
-                Calculated student price: <span className="font-semibold text-green-600">${previewPrice}</span>
-                {request.country && (
-                  <span className="ml-2 text-xs">
-                    (Multiplier: {request.country.toUpperCase() === 'LEBANON' ? '×2' : '×3'})
-                  </span>
-                )}
-              </div>
-            )}
           </div>
           
           <div className="space-y-2">
-            <Label>Student Price (Optional - Leave empty for auto-calculation)</Label>
+            <Label>Student Price (Optional - Leave empty to use tutor price)</Label>
             <Input
-              placeholder="Leave empty for auto-calculation"
+              placeholder="Leave empty to use tutor price"
               value={studentPrice}
               onChange={(e) => setStudentPrice(e.target.value)}
               type="number"
@@ -330,7 +291,7 @@ export function AssignmentManagement({
               min="0"
             />
             <p className="text-xs text-muted-foreground">
-              Setting this will override all calculations. Leave empty to use calculated price.
+              If left empty, student price will be set to the same as tutor price.
             </p>
           </div>
           
@@ -345,26 +306,15 @@ export function AssignmentManagement({
               min="0"
             />
             <p className="text-xs text-muted-foreground">
-              Minimum price that will be enforced for student price calculation.
+              Optional minimum price setting.
             </p>
           </div>
           
           <div>
-            <Label className="text-sm text-muted-foreground">Current Effective Student Price</Label>
+            <Label className="text-sm text-muted-foreground">Current Student Price</Label>
             <div className="p-2 bg-gray-50 rounded-md">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-lg">${effectivePrice.price}</span>
-                {effectivePrice.isOverride && (
-                  <Badge variant="outline" className="text-xs">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Override
-                  </Badge>
-                )}
-                {effectivePrice.isCalculated && (
-                  <Badge variant="secondary" className="text-xs">
-                    Calculated
-                  </Badge>
-                )}
+                <span className="font-semibold text-lg">${effectivePrice}</span>
               </div>
             </div>
           </div>

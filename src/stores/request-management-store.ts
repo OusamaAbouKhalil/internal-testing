@@ -65,6 +65,7 @@ interface RequestManagementStore {
   assignStudent: (requestId: string, studentId: string, studentPrice: string) => Promise<void>;
   setTutorPrice: (requestId: string, tutorPrice: string) => Promise<void>;
   setStudentPrice: (requestId: string, studentPrice: string) => Promise<void>;
+  setMinPrice: (requestId: string, minPrice: string) => Promise<void>;
   cancelRequest: (requestId: string, reason: string) => Promise<void>;
   completeRequest: (requestId: string, feedback?: string) => Promise<void>;
   
@@ -525,9 +526,38 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       get().fetchRequests(); // Refresh the list
     } catch (error: any) {
       console.error('Error setting student price:', error);
-      set({ 
+      set({
         error: error.message || 'Failed to set student price',
-        loading: false 
+        loading: false
+      });
+      throw error;
+    }
+  },
+
+  setMinPrice: async (requestId, minPrice) => {
+    try {
+      set({ loading: true, error: null });
+      
+      const response = await fetch(`/api/requests/${requestId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_min_price',
+          minPrice: minPrice || ''
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to set minimum price');
+      }
+      
+      set({ loading: false, pageCache: new Map() }); // Clear cache
+      get().fetchRequests(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error setting minimum price:', error);
+      set({
+        error: error.message || 'Failed to set minimum price',
+        loading: false
       });
       throw error;
     }

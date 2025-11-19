@@ -31,7 +31,8 @@ import {
   CheckCircle,
   Headphones,
   Edit,
-  Trash2
+  Trash2,
+  Star
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { db } from '@/config/firebase';
@@ -77,6 +78,16 @@ interface SupportMessage {
   file_name?: string;
 }
 
+interface Rating {
+  date: Timestamp | string;
+  rating: number;
+}
+
+// Combined type for timeline items (messages and ratings)
+type TimelineItem = 
+  | { type: 'message'; data: SupportMessage }
+  | { type: 'rating'; data: Rating; id: string };
+
 interface SupportRoom {
   id: string;
   user_id: string;
@@ -86,6 +97,7 @@ interface SupportRoom {
   admin_id?: string;
   assistant_thread_id?: string;
   rating?: number;
+  ratings?: Rating[]; // Array of ratings with timestamps
   with_agent?: boolean;
   admin?: {
     id: string;
@@ -125,6 +137,7 @@ export function CustomerSupportUI({
   const [rooms, setRooms] = useState<SupportRoom[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<SupportRoom | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
+  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -635,6 +648,89 @@ export function CustomerSupportUI({
     return `${baseUrl}/${cleanPath}`;
   };
 
+  // Helper to get timestamp in milliseconds
+  const getTimestampMillis = (timestamp: Timestamp | string | any): number => {
+    try {
+      if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().getTime();
+      }
+      if (timestamp && typeof timestamp === 'object') {
+        if (timestamp._seconds !== undefined) {
+          return timestamp._seconds * 1000 + (timestamp._nanoseconds || 0) / 1000000;
+        }
+        if (timestamp.seconds !== undefined) {
+          return timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000;
+        }
+      }
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).getTime();
+      }
+      return new Date(timestamp).getTime();
+    } catch {
+      return 0;
+    }
+  };
+
+  // Merge messages and ratings into a single timeline
+  const mergeTimeline = (messages: SupportMessage[], ratings: Rating[] = []): TimelineItem[] => {
+    const timeline: TimelineItem[] = [];
+
+    // Add messages
+    messages.forEach(msg => {
+      timeline.push({ type: 'message', data: msg });
+    });
+
+    // Add ratings
+    ratings.forEach((rating, index) => {
+      timeline.push({
+        type: 'rating',
+        data: rating,
+        id: `rating-${index}-${getTimestampMillis(rating.date)}`
+      });
+    });
+
+    // Sort by timestamp
+    timeline.sort((a, b) => {
+      const timeA = a.type === 'message' 
+        ? getTimestampMillis(a.data.created_at)
+        : getTimestampMillis(a.data.date);
+      const timeB = b.type === 'message'
+        ? getTimestampMillis(b.data.created_at)
+        : getTimestampMillis(b.data.date);
+      return timeA - timeB;
+    });
+
+    return timeline;
+  };
+
+  // Render rating display
+  const renderRating = (rating: Rating) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Star
+          key={i}
+          className={`h-5 w-5 ${i <= rating.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'}`}
+        />
+      );
+    }
+
+    return (
+      <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/50 rounded-lg p-4">
+        <div className="flex items-center justify-center space-x-2 mb-2">
+          <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+          <span className="text-sm font-semibold text-yellow-300">Customer Rating</span>
+        </div>
+        <div className="flex items-center justify-center space-x-1 mb-2">
+          {stars}
+        </div>
+        <p className="text-xs text-center text-gray-300">
+          {rating.rating} out of 5 stars
+        </p>
+      </div>
+    );
+  };
+
   // Render message content based on type
   const renderMessageContent = (message: SupportMessage) => {
     switch (message.message_type) {
@@ -806,6 +902,7 @@ export function CustomerSupportUI({
   useEffect(() => {
     if (!selectedRoom) {
       setMessages([]);
+      setTimelineItems([]);
       return;
     }
 
@@ -850,6 +947,18 @@ export function CustomerSupportUI({
 
     return () => unsubscribe();
   }, [selectedRoom?.id]); // Only depend on room ID, not the entire room object
+
+  // Update timeline items whenever messages or selectedRoom changes
+  useEffect(() => {
+    if (!selectedRoom) {
+      setTimelineItems([]);
+      return;
+    }
+
+    const ratings = selectedRoom.ratings || [];
+    const timeline = mergeTimeline(messages, ratings);
+    setTimelineItems(timeline);
+  }, [messages, selectedRoom]);
 
   // Real-time listener for rooms (to update conversation list)
   useEffect(() => {
@@ -933,6 +1042,7 @@ export function CustomerSupportUI({
           admin_id: roomData.admin_id,
           assistant_thread_id: roomData.assistant_thread_id,
           rating: roomData.rating,
+          ratings: roomData.ratings || [], // Include ratings array
           with_agent: roomData.with_agent,
           student,
           tutor,
@@ -988,10 +1098,10 @@ export function CustomerSupportUI({
     };
   }, [rooms]);
 
-  // Auto scroll to bottom when new messages arrive
+  // Auto scroll to bottom when new messages or timeline items arrive
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [timelineItems]);
 
   return (
     <div className="flex h-[calc(100vh-3rem)] bg-background overflow-hidden rounded-lg">
@@ -1224,12 +1334,31 @@ export function CustomerSupportUI({
                   <LoadingSpinner />
                   <span className="ml-2 text-muted-foreground">Loading messages...</span>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : timelineItems.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   No messages yet. Start the conversation!
                 </div>
               ) : (
-                messages.map((message) => {
+                timelineItems.map((item) => {
+                  // Render rating
+                  if (item.type === 'rating') {
+                    return (
+                      <div key={item.id} className="flex justify-center">
+                        <div className="max-w-md w-full">
+                          {renderRating(item.data)}
+                          <p 
+                            className="text-xs text-muted-foreground mt-2 text-center cursor-help" 
+                            title={formatFullTime(item.data.date)}
+                          >
+                            {formatMessageTime(item.data.date)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Render message
+                  const message = item.data;
                   // Handle special system messages
                   if ([
                     CustomerSupportMessageType.CONNECTAGENT,

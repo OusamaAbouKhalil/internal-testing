@@ -70,12 +70,12 @@ const getNavigationItems = (hasPermission: (resource: string, action: string) =>
     icon: UserCog, 
     permission: { resource: 'tutors', action: 'read' } 
   },
-  { 
-    name: "Notifications", 
-    href: "/dashboard/notifications", 
-    icon: Bell, 
-    permission: { resource: 'notifications', action: 'read' } 
-  },
+  // { 
+  //   name: "Notifications", 
+  //   href: "/dashboard/notifications", 
+  //   icon: Bell, 
+  //   permission: { resource: 'notifications', action: 'read' } 
+  // },
   { 
     name: "Subjects", 
     href: "/dashboard/subjects", 

@@ -30,6 +30,9 @@ export async function POST(
       case 'set_student_price':
         await setStudentPrice(requestId, data.studentPrice);
         break;
+      case 'set_min_price':
+        await setMinPrice(requestId, data.minPrice);
+        break;
       case 'cancel':
         await cancelRequest(requestId, data.reason);
         break;
@@ -467,6 +470,15 @@ async function setTutorPrice(requestId: string, tutorPrice: string) {
 async function setStudentPrice(requestId: string, studentPrice: string) {
   const updateData = {
     student_price: studentPrice,
+    updated_at: new Date()
+  };
+  
+  await adminDb.collection('requests').doc(requestId).update(updateData);
+}
+
+async function setMinPrice(requestId: string, minPrice: string) {
+  const updateData = {
+    min_price: minPrice || null,
     updated_at: new Date()
   };
   

@@ -14,6 +14,7 @@ import { UserPlus, AlertCircle } from 'lucide-react';
 interface AssignmentManagementProps {
   request: Request;
   onAssignTutor: (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => void;
+  onSetMinPrice?: (minPrice: string) => void;
   loading: boolean;
 }
 
@@ -201,7 +202,8 @@ function TutorSearchComponent({
 
 export function AssignmentManagement({ 
   request, 
-  onAssignTutor, 
+  onAssignTutor,
+  onSetMinPrice,
   loading 
 }: AssignmentManagementProps) {
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
@@ -238,6 +240,12 @@ export function AssignmentManagement({
         finalStudentPrice || undefined,
         minPrice || undefined
       );
+    }
+  };
+
+  const handleUpdateMinPriceOnly = () => {
+    if (onSetMinPrice) {
+      onSetMinPrice(minPrice);
     }
   };
 
@@ -297,16 +305,29 @@ export function AssignmentManagement({
           
           <div className="space-y-2">
             <Label>Minimum Price (Optional)</Label>
-            <Input
-              placeholder="Enter minimum price..."
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              type="number"
-              step="0.01"
-              min="0"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter minimum price..."
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                className="flex-1"
+              />
+              {onSetMinPrice && (
+                <Button
+                  onClick={handleUpdateMinPriceOnly}
+                  disabled={loading}
+                  variant="outline"
+                  className="whitespace-nowrap"
+                >
+                  Update Min Price
+                </Button>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Optional minimum price setting.
+              Optional minimum price setting. Click "Update Min Price" to update only this field.
             </p>
           </div>
           

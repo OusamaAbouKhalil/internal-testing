@@ -36,6 +36,7 @@ export default function RequestDetailPage() {
     assignTutor,
     setTutorPrice,
     setStudentPrice,
+    setMinPrice,
     fetchTutorOffers,
     tutorOffers
   } = useRequestManagementStore();
@@ -196,6 +197,18 @@ export default function RequestDetailPage() {
     }
   };
 
+  const handleSetMinPrice = async (minPrice: string) => {
+    if (!request) return;
+    
+    try {
+      await setMinPrice(request.id, minPrice);
+      // Refresh only this specific request
+      await refreshRequest();
+    } catch (error) {
+      console.error('Error setting minimum price:', error);
+    }
+  };
+
   const getRequestStatusColor = (status: string): string => {
     switch (status?.toLowerCase()) {
       case 'new':
@@ -351,6 +364,7 @@ export default function RequestDetailPage() {
               <AssignmentManagement 
                 request={request}
                 onAssignTutor={handleAssignTutor}
+                onSetMinPrice={handleSetMinPrice}
                 loading={loading}
               />
             </TabsContent>

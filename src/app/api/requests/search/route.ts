@@ -75,6 +75,7 @@ export async function POST(request: Request) {
           'country',
           'student_price',
           'tutor_price',
+          'min_price',
           'deadline',
           'timezone',
           'created_at',

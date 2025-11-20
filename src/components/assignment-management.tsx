@@ -200,6 +200,13 @@ function TutorSearchComponent({
   );
 }
 
+// Helper function to normalize price values (handles null, undefined, number, string)
+const normalizePrice = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return value.toString();
+  return value.toString();
+};
+
 export function AssignmentManagement({ 
   request, 
   onAssignTutor,
@@ -207,9 +214,16 @@ export function AssignmentManagement({
   loading 
 }: AssignmentManagementProps) {
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
-  const [tutorPrice, setTutorPrice] = useState(request.tutor_price || '');
-  const [studentPrice, setStudentPrice] = useState(request.student_price || '');
-  const [minPrice, setMinPrice] = useState(request.min_price || '');
+  const [tutorPrice, setTutorPrice] = useState(normalizePrice(request.tutor_price));
+  const [studentPrice, setStudentPrice] = useState(normalizePrice(request.student_price));
+  const [minPrice, setMinPrice] = useState(normalizePrice(request.min_price));
+
+  // Sync state with request prop when it changes (including when dialog opens with different request)
+  useEffect(() => {
+    setTutorPrice(normalizePrice(request.tutor_price));
+    setStudentPrice(normalizePrice(request.student_price));
+    setMinPrice(normalizePrice(request.min_price));
+  }, [request.id, request.tutor_price, request.student_price, request.min_price]);
 
   // Determine effective student price for display (no multiplier calculation)
   const effectivePrice = studentPrice || request.student_price || tutorPrice || request.tutor_price || '0';
@@ -245,9 +259,17 @@ export function AssignmentManagement({
 
   const handleUpdateMinPriceOnly = () => {
     if (onSetMinPrice) {
-      onSetMinPrice(minPrice);
+      // Normalize empty string to empty string (API will convert to null)
+      const normalizedMinPrice = minPrice.trim() === '' ? '' : minPrice;
+      onSetMinPrice(normalizedMinPrice);
     }
   };
+
+  // Check if minPrice has changed from the request value
+  // Normalize both values for comparison (null/undefined/empty string are treated the same)
+  const normalizedCurrent = normalizePrice(request.min_price).trim();
+  const normalizedNew = minPrice.trim();
+  const minPriceHasChanged = normalizedNew !== normalizedCurrent;
 
   return (
     <div className="space-y-4">
@@ -315,16 +337,14 @@ export function AssignmentManagement({
                 min="0"
                 className="flex-1"
               />
-              {onSetMinPrice && (
                 <Button
                   onClick={handleUpdateMinPriceOnly}
-                  disabled={loading}
+                  disabled={loading || !minPriceHasChanged}
                   variant="outline"
                   className="whitespace-nowrap"
                 >
                   Update Min Price
                 </Button>
-              )}
             </div>
             <p className="text-xs text-muted-foreground">
               Optional minimum price setting. Click "Update Min Price" to update only this field.

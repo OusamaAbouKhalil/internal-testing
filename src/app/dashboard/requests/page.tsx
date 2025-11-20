@@ -165,7 +165,6 @@ function ChatButton({ request }: { request: Request }) {
         } catch (error) {
           console.error('Error fetching user info:', error);
         } finally {
-          console.log("access here")
           setLoadingInfo(false);
         }
       };
@@ -201,7 +200,6 @@ function ChatButton({ request }: { request: Request }) {
 function RequestCard({ request }: { request: Request }) {
   const { hasPermission } = useFirebaseAuthStore();
 	const formatDate = (value: any) => {
-    console.log("date is: " + value)
 		if (value === undefined || value === null) return 'Not set';
 		try {
 			let date: Date | null = null;
@@ -260,7 +258,6 @@ function RequestCard({ request }: { request: Request }) {
         // Case 1: deadline is time-only like "HH:MM" → combine with request.date
         if (typeof trimmedDeadline === 'string' && /^\d{1,2}:\d{2}$/.test(trimmedDeadline)) {
           const dateString = request.date;
-          console.log("date string is: " + dateString)
           if (dateString && typeof dateString === 'string') {
             const combined = combineDateAndTime(dateString, trimmedDeadline);
             if (request.timezone) {
@@ -268,7 +265,6 @@ function RequestCard({ request }: { request: Request }) {
             }
             return format(combined, 'MMM dd, yyyy HH:mm');
           } else {
-            console.log("date string is not: " + dateString)
           }
           // No valid date to combine with → just show time
           return trimmedDeadline;
@@ -470,17 +466,19 @@ function RequestCard({ request }: { request: Request }) {
   );
 }
 
-function RequestActions({ request }: { request: Request }) {
+function RequestActions({ request: initialRequest }: { request: Request }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState('details');
-  const [descriptionValue, setDescriptionValue] = useState<string>(request.description || '');
+  const [descriptionValue, setDescriptionValue] = useState<string>(initialRequest.description || '');
   
   const {
+    requests,
     changeRequestStatus,
     assignTutor,
     assignStudent,
     setTutorPrice,
     setStudentPrice,
+    setMinPrice,
     cancelRequest,
     completeRequest,
     fetchTutorOffers,
@@ -488,6 +486,9 @@ function RequestActions({ request }: { request: Request }) {
     loading,
     updateRequest
   } = useRequestManagementStore();
+
+  // Get the latest request from the store to ensure we have the most up-to-date data
+  const request = requests.find(r => r.id === initialRequest.id) || initialRequest;
 
   const handleStatusChange = async (status: string, reason?: string) => {
     try {
@@ -507,10 +508,19 @@ function RequestActions({ request }: { request: Request }) {
     }
   };
 
+  const handleSetMinPrice = async (minPrice: string) => {
+    try {
+      await setMinPrice(request.id, minPrice);
+      // The store will optimistically update, so the request prop will be updated automatically
+    } catch (error) {
+      console.error('Error setting minimum price:', error);
+    }
+  };
+
   // Sync local description when request changes
   useEffect(() => {
     setDescriptionValue(request.description || '');
-  }, [request.description]);
+  }, [request.description, request.id]);
 
   const handleSaveDescription = async () => {
     try {
@@ -584,6 +594,7 @@ function RequestActions({ request }: { request: Request }) {
             <AssignmentManagement 
               request={request}
               onAssignTutor={handleAssignTutor}
+              onSetMinPrice={handleSetMinPrice}
               loading={loading}
             />
           </TabsContent>

@@ -491,7 +491,6 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
   setTutorPrice: async (requestId, tutorPrice) => {
     try {
       set({ loading: true, error: null });
-      console.log("tutorPrice: " + tutorPrice);
       const updateData = {
         tutor_price: tutorPrice ? tutorPrice : '',
         updated_at: new Date().toISOString()
@@ -538,21 +537,38 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
     try {
       set({ loading: true, error: null });
       
+      // Normalize minPrice: empty string becomes null
+      const normalizedMinPrice = minPrice && minPrice.trim() !== '' ? minPrice : null;
+      
+      // Optimistically update the request in the store
+      const state = get();
+      const updatedRequests = state.requests.map(req => 
+        req.id === requestId 
+          ? { ...req, min_price: normalizedMinPrice }
+          : req
+      );
+      set({ requests: updatedRequests });
+      
       const response = await fetch(`/api/requests/${requestId}/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'set_min_price',
-          minPrice: minPrice || ''
+          minPrice: normalizedMinPrice || ''
         })
       });
 
       if (!response.ok) {
+        // Revert optimistic update on error
+        set({ requests: state.requests });
         throw new Error('Failed to set minimum price');
       }
       
       set({ loading: false, pageCache: new Map() }); // Clear cache
-      get().fetchRequests(); // Refresh the list
+      // Refresh the list in the background to ensure consistency
+      get().fetchRequests().catch(err => {
+        console.error('Error refreshing requests after min price update:', err);
+      });
     } catch (error: any) {
       console.error('Error setting minimum price:', error);
       set({

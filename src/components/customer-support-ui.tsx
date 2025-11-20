@@ -266,8 +266,6 @@ export function CustomerSupportUI({
       setJoiningChat(true);
       setError(null);
       
-      console.log('Joining chat with:', { room_id: roomId, admin_id: currentUserId });
-      console.log('Current agent connected status:', isAgentConnected);
       
       // First, join the room (update admin_id)
       const joinResponse = await fetch('/api/support/admin/join-room', {

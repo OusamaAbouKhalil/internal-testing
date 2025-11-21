@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAlgoliaClient, getStudentsIndexName } from '@/config/algolia';
+import { enrichStudentsWithOtpPhone } from '@/lib/otp-phone-lookup';
 
 type SearchBody = {
   query?: string;
@@ -147,9 +148,12 @@ export async function POST(request: Request) {
       return timeB - timeA; // Descending order
     });
 
+    // Enrich students with phone numbers from OTP verifications if missing
+    const enrichedHits = await enrichStudentsWithOtpPhone(sortedHits);
+
     return NextResponse.json({
       success: true,
-      hits: sortedHits,
+      hits: enrichedHits,
       total: res.nbHits,
       page: res.page !== undefined ? res.page + 1 : 1,
       totalPages: res.nbPages,

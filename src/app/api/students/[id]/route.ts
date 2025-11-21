@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
+import { enrichStudentWithOtpPhone } from '@/lib/otp-phone-lookup';
 
 /**
  * API Route for fetching a student by ID
@@ -32,10 +33,13 @@ export async function GET(
       );
     }
 
-    const student = {
+    let student = {
       id: studentDoc.id,
       ...studentDoc.data()
     };
+
+    // Enrich with phone number from OTP verifications if missing
+    student = await enrichStudentWithOtpPhone(student);
 
     return NextResponse.json({
       success: true,

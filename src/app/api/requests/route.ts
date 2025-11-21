@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('date_to')) filters.date_to = searchParams.get('date_to')!;
     if (searchParams.get('student_id')) filters.student_id = searchParams.get('student_id')!;
     if (searchParams.get('tutor_id')) filters.tutor_id = searchParams.get('tutor_id')!;
+    
+    // Get promo_id directly from search params (not in RequestFilters type)
+    const promoId = searchParams.get('promo_id');
 
     // Parse pagination parameters
     const page = parseInt(searchParams.get('page') || '1');
@@ -49,6 +52,9 @@ export async function GET(request: NextRequest) {
     }
     if (filters.tutor_id) {
       query = query.where('tutor_id', '==', filters.tutor_id);
+    }
+    if (promoId) {
+      query = query.where('promo_id', '==', promoId);
     }
 
     // Apply pagination cursor if provided
@@ -100,7 +106,9 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ 
-      requests: filteredRequests,
+      success: true,
+      data: filteredRequests,
+      requests: filteredRequests, // Keep for backwards compatibility
       pagination: {
         currentPage: page,
         pageSize: pageSize,

@@ -24,7 +24,9 @@ import {
   CheckCircle,
   XCircle,
   Power,
-  PowerOff
+  PowerOff,
+  ExternalLink,
+  DollarSign
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePromoCodeManagementStore } from "@/stores/promo-code-management-store";
@@ -32,6 +34,17 @@ import { useFirebaseAuthStore } from "@/stores/firebase-auth-store";
 import { PromoCode, PromoCodeFilters, PromoCodeTypeLabel, PromoCodeUsage } from "@/types/promo-code";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface PromoCodeRequest {
+  id: string;
+  label: string;
+  subject: string;
+  student_price: string;
+  student_id: string;
+  student_email?: string;
+  student_nickname?: string;
+  created_at: any;
+}
 
 export default function PromoCodesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,7 +55,9 @@ export default function PromoCodesPage() {
   const [filters, setFilters] = useState<PromoCodeFilters>({});
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [selectedPromoCodeUsage, setSelectedPromoCodeUsage] = useState<PromoCodeUsage[]>([]);
+  const [selectedPromoCodeRequests, setSelectedPromoCodeRequests] = useState<PromoCodeRequest[]>([]);
   const [showUsageDialog, setShowUsageDialog] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(false);
 
   const { 
     promoCodes, 
@@ -119,12 +134,57 @@ export default function PromoCodesPage() {
 
   const handleViewUsage = async (promoCode: PromoCode) => {
     try {
-      const usage = await fetchPromoCodeUsage(promoCode.id);
-      setSelectedPromoCodeUsage(usage);
+      setLoadingRequests(true);
       setSelectedPromoCode(promoCode);
       setShowUsageDialog(true);
+      
+      // Fetch all requests that used this promo code
+      const response = await fetch(`/api/requests?promo_id=${promoCode.id}&pageSize=1000`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        // Fetch student details for each request
+        const requestsWithStudents = await Promise.all(
+          data.data.map(async (request: any) => {
+            try {
+              const studentResponse = await fetch(`/api/students/${request.student_id}`);
+              const studentData = await studentResponse.json();
+              
+              return {
+                id: request.id,
+                label: request.label || 'Untitled',
+                subject: request.subject || 'N/A',
+                student_price: request.student_price || '0',
+                student_id: request.student_id,
+                student_email: studentData.success ? studentData.student.email : 'N/A',
+                student_nickname: studentData.success ? studentData.student.nickname : null,
+                created_at: request.created_at
+              };
+            } catch (err) {
+              console.error('Error fetching student:', err);
+              return {
+                id: request.id,
+                label: request.label || 'Untitled',
+                subject: request.subject || 'N/A',
+                student_price: request.student_price || '0',
+                student_id: request.student_id,
+                student_email: 'N/A',
+                created_at: request.created_at
+              };
+            }
+          })
+        );
+        
+        setSelectedPromoCodeRequests(requestsWithStudents);
+      }
+      
+      // Also fetch the usage data for reference
+      const usage = await fetchPromoCodeUsage(promoCode.id);
+      setSelectedPromoCodeUsage(usage);
     } catch (error) {
       console.error('Failed to fetch promo code usage:', error);
+    } finally {
+      setLoadingRequests(false);
     }
   };
 
@@ -492,66 +552,102 @@ export default function PromoCodesPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Usage Details - {selectedPromoCode?.code}
+                Requests Using {selectedPromoCode?.code}
               </DialogTitle>
               <DialogDescription>
-                View who has used this promo code and how many times
+                View all requests that used this promo code
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">
-              {selectedPromoCodeUsage.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-foreground mb-2">No usage recorded</h3>
-                  <p className="text-muted-foreground">This promo code hasn't been used by anyone yet.</p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">
+                    {loadingRequests ? 'Loading...' : `Total Requests: ${selectedPromoCodeRequests.length}`}
+                  </h4>
+                  {!loadingRequests && selectedPromoCodeRequests.length > 0 && (
+                    <h4 className="font-medium">
+                      Total Value: ${selectedPromoCodeRequests.reduce((sum, req) => sum + parseFloat(req.student_price || '0'), 0).toFixed(2)}
+                    </h4>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Total Users: {selectedPromoCodeUsage.length}</h4>
-                    <h4 className="font-medium">Total Usage: {selectedPromoCodeUsage.reduce((sum, usage) => sum + usage.number_of_usage, 0)}</h4>
-                  </div>
-                  
-                  <div className="border rounded-lg">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
+                
+                <div className="border rounded-lg">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Student Email
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Request Name
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                            Price
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {loadingRequests ? (
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Student ID
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Email
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                              Times Used
-                            </th>
-                            
+                            <td colSpan={3} className="px-4 py-8 text-center">
+                              <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
+                              <p className="mt-2 text-sm text-muted-foreground">Loading requests...</p>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedPromoCodeUsage.map((usage) => (
-                            <tr key={usage.student_id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-foreground font-mono">
-                                {usage.student_id}
+                        ) : selectedPromoCodeRequests.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-8 text-center">
+                              <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-sm font-medium text-foreground">No requests found</p>
+                              <p className="text-xs text-muted-foreground mt-1">This promo code hasn't been used on any requests yet.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          selectedPromoCodeRequests.map((request) => (
+                            <tr key={request.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm">
+                                <a
+                                  href={`/dashboard/students/${request.student_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 w-fit"
+                                >
+                                  {request.student_email}
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
                               </td>
-                              <td className="px-4 py-3 text-sm text-foreground">
-                                {usage.email}
+                              <td className="px-4 py-3 text-sm">
+                                <div className="space-y-1">
+                                  <a
+                                    href={`/dashboard/requests/${request.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 w-fit"
+                                  >
+                                    {request.label}
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                  <div className="text-xs text-muted-foreground">
+                                    {request.subject}
+                                  </div>
+                                </div>
                               </td>
-                              <td className="px-4 py-3 text-sm text-foreground">
-                                <Badge variant="outline" className="font-mono">
-                                  {usage.number_of_usage}
-                                </Badge>
+                              <td className="px-4 py-3 text-sm">
+                                <div className="flex items-center gap-1 font-semibold text-green-600">
+                                  <DollarSign className="h-4 w-4" />
+                                  {parseFloat(request.student_price || '0').toFixed(2)}
+                                </div>
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>

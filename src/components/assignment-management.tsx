@@ -9,11 +9,12 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Request } from '@/types/request';
 import { Tutor } from '@/types/tutor';
 import { UserPlus, AlertCircle } from 'lucide-react';
-import { calculateStudentPrice, calculateTutorOfferPrice, getEffectiveStudentPrice } from '@/lib/pricing-utils';
+// Removed pricing-utils imports - no longer using multiplier calculations
 
 interface AssignmentManagementProps {
   request: Request;
   onAssignTutor: (tutorId: string, tutorPrice: string, studentPrice?: string, minPrice?: string) => void;
+  onSetMinPrice?: (minPrice: string) => void;
   loading: boolean;
 }
 
@@ -199,33 +200,33 @@ function TutorSearchComponent({
   );
 }
 
+// Helper function to normalize price values (handles null, undefined, number, string)
+const normalizePrice = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'number') return value.toString();
+  return value.toString();
+};
+
 export function AssignmentManagement({ 
   request, 
-  onAssignTutor, 
+  onAssignTutor,
+  onSetMinPrice,
   loading 
 }: AssignmentManagementProps) {
   const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
-  const [tutorPrice, setTutorPrice] = useState(request.tutor_price || '');
-  const [studentPrice, setStudentPrice] = useState(request.student_price || '');
-  const [minPrice, setMinPrice] = useState(request.min_price || '');
+  const [tutorPrice, setTutorPrice] = useState(normalizePrice(request.tutor_price));
+  const [studentPrice, setStudentPrice] = useState(normalizePrice(request.student_price));
+  const [minPrice, setMinPrice] = useState(normalizePrice(request.min_price));
 
-  // Calculate effective student price for display
-  const effectivePrice = getEffectiveStudentPrice({
-    student_price: studentPrice || request.student_price,
-    tutor_price: tutorPrice || request.tutor_price,
-    country: request.country,
-    min_price: minPrice || request.min_price
-  });
+  // Sync state with request prop when it changes (including when dialog opens with different request)
+  useEffect(() => {
+    setTutorPrice(normalizePrice(request.tutor_price));
+    setStudentPrice(normalizePrice(request.student_price));
+    setMinPrice(normalizePrice(request.min_price));
+  }, [request.id, request.tutor_price, request.student_price, request.min_price]);
 
-  // Calculate preview price when tutor price changes
-  const previewPrice = tutorPrice 
-    ? calculateStudentPrice({
-        student_price: studentPrice || null, // Use manual override if set
-        tutor_price: tutorPrice,
-        country: request.country,
-        min_price: minPrice || request.min_price || null
-      })
-    : effectivePrice.price;
+  // Determine effective student price for display (no multiplier calculation)
+  const effectivePrice = studentPrice || request.student_price || tutorPrice || request.tutor_price || '0';
 
   const handleTutorSelect = (tutor: Tutor) => {
     setSelectedTutor(tutor);
@@ -233,42 +234,42 @@ export function AssignmentManagement({
 
   const handleUpdatePrices = () => {
     if (selectedTutor && tutorPrice) {
-      // Calculate student_price when assigning tutor (if not manually overridden)
-      const calculatedStudentPrice = studentPrice 
-        ? studentPrice 
-        : calculateStudentPrice({
-            student_price: null,
-            tutor_price: tutorPrice,
-            country: request.country,
-            min_price: minPrice || null
-          });
+      // Use studentPrice if provided, otherwise use tutorPrice (no multiplier calculation)
+      const finalStudentPrice = studentPrice || tutorPrice;
       
       // Pass tutor_price, student_price, and min_price all at once
       onAssignTutor(
         selectedTutor.id, 
         tutorPrice, 
-        calculatedStudentPrice || undefined,
+        finalStudentPrice || undefined,
         minPrice || undefined
       );
     } else if (tutorPrice) {
       // If no tutor selected, just update prices for existing tutor
-      const calculatedStudentPrice = studentPrice 
-        ? studentPrice 
-        : calculateStudentPrice({
-            student_price: null,
-            tutor_price: tutorPrice,
-            country: request.country,
-            min_price: minPrice || null
-          });
+      const finalStudentPrice = studentPrice || tutorPrice;
       
       onAssignTutor(
         request.tutor_id || '', 
         tutorPrice, 
-        calculatedStudentPrice || undefined,
+        finalStudentPrice || undefined,
         minPrice || undefined
       );
     }
   };
+
+  const handleUpdateMinPriceOnly = () => {
+    if (onSetMinPrice) {
+      // Normalize empty string to empty string (API will convert to null)
+      const normalizedMinPrice = minPrice.trim() === '' ? '' : minPrice;
+      onSetMinPrice(normalizedMinPrice);
+    }
+  };
+
+  // Check if minPrice has changed from the request value
+  // Normalize both values for comparison (null/undefined/empty string are treated the same)
+  const normalizedCurrent = normalizePrice(request.min_price).trim();
+  const normalizedNew = minPrice.trim();
+  const minPriceHasChanged = normalizedNew !== normalizedCurrent;
 
   return (
     <div className="space-y-4">
@@ -307,22 +308,12 @@ export function AssignmentManagement({
               step="0.01"
               min="0"
             />
-            {tutorPrice && (
-              <div className="text-sm text-muted-foreground">
-                Calculated student price: <span className="font-semibold text-green-600">${previewPrice}</span>
-                {request.country && (
-                  <span className="ml-2 text-xs">
-                    (Multiplier: {request.country.toUpperCase() === 'LEBANON' ? '×2' : '×3'})
-                  </span>
-                )}
-              </div>
-            )}
           </div>
           
           <div className="space-y-2">
-            <Label>Student Price (Optional - Leave empty for auto-calculation)</Label>
+            <Label>Student Price (Optional - Leave empty to use tutor price)</Label>
             <Input
-              placeholder="Leave empty for auto-calculation"
+              placeholder="Leave empty to use tutor price"
               value={studentPrice}
               onChange={(e) => setStudentPrice(e.target.value)}
               type="number"
@@ -330,41 +321,41 @@ export function AssignmentManagement({
               min="0"
             />
             <p className="text-xs text-muted-foreground">
-              Setting this will override all calculations. Leave empty to use calculated price.
+              If left empty, student price will be set to the same as tutor price.
             </p>
           </div>
           
           <div className="space-y-2">
             <Label>Minimum Price (Optional)</Label>
-            <Input
-              placeholder="Enter minimum price..."
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              type="number"
-              step="0.01"
-              min="0"
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter minimum price..."
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0"
+                className="flex-1"
+              />
+                <Button
+                  onClick={handleUpdateMinPriceOnly}
+                  disabled={loading || !minPriceHasChanged}
+                  variant="outline"
+                  className="whitespace-nowrap"
+                >
+                  Update Min Price
+                </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              Minimum price that will be enforced for student price calculation.
+              Optional minimum price setting. Click "Update Min Price" to update only this field.
             </p>
           </div>
           
           <div>
-            <Label className="text-sm text-muted-foreground">Current Effective Student Price</Label>
+            <Label className="text-sm text-muted-foreground">Current Student Price</Label>
             <div className="p-2 bg-gray-50 rounded-md">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-lg">${effectivePrice.price}</span>
-                {effectivePrice.isOverride && (
-                  <Badge variant="outline" className="text-xs">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Override
-                  </Badge>
-                )}
-                {effectivePrice.isCalculated && (
-                  <Badge variant="secondary" className="text-xs">
-                    Calculated
-                  </Badge>
-                )}
+                <span className="font-semibold text-lg">${effectivePrice}</span>
               </div>
             </div>
           </div>

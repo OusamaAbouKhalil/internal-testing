@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
-import { calculateTutorOfferPrice } from '@/lib/pricing-utils';
+// Removed pricing-utils import - no longer using multiplier calculations
 
 export async function GET(
   request: NextRequest,
@@ -69,17 +69,15 @@ export async function POST(
     }
     
     const requestData = requestDoc.data();
-    const country = requestData?.country || null;
-    
-    // Calculate price (tutor_price × multiplier)
-    const calculatedPrice = calculateTutorOfferPrice(tutorPriceValue, country);
+    // Price should be the same as student_price from request, or tutor_price if student_price doesn't exist
+    const studentPrice = requestData?.student_price || tutorPriceValue;
     
     const now = new Date();
     
     const newOffer = {
       tutor_id: tutorId,
       tutor_price: tutorPriceValue, // What tutor will receive
-      price: calculatedPrice, // Calculated price (tutor_price × multiplier)
+      price: studentPrice, // Same as student_price
       request_id: requestId,
       status: 'pending',
       cancel_reason: null,
@@ -101,7 +99,7 @@ export async function POST(
       // Update existing offer
       await tutorOfferRef.update({
         tutor_price: tutorPriceValue,
-        price: calculatedPrice,
+        price: studentPrice,
         status: 'pending',
         updated_at: now
       });

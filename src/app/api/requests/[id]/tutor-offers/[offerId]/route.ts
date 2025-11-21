@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/config/firebase-admin';
-import { calculateStudentPrice } from '@/lib/pricing-utils';
 
 export async function PUT(
   request: NextRequest,
@@ -86,6 +85,17 @@ async function updateTutorOffer(requestId: string, offerId: string, status?: str
 }
 
 async function acceptTutorOffer(requestId: string, offerId: string) {
+  // Update the offer status
+  await adminDb
+    .collection('requests')
+    .doc(requestId)
+    .collection('tutor_offers')
+    .doc(offerId)
+    .update({
+      status: 'ACCEPTED',
+      updated_at: new Date()
+    });
+  
   // Get the offer to get tutor info
   const offerDoc = await adminDb
     .collection('requests')
@@ -94,84 +104,20 @@ async function acceptTutorOffer(requestId: string, offerId: string) {
     .doc(offerId)
     .get();
   
-  if (!offerDoc.exists) {
-    throw new Error('Offer not found');
-  }
-  
   const offerData = offerDoc.data();
-  if (!offerData) {
-    throw new Error('Offer data not found');
-  }
   
-  // Get request document to access country and min_price for price calculation
-  const requestDoc = await adminDb.collection('requests').doc(requestId).get();
-  if (!requestDoc.exists) {
-    throw new Error('Request not found');
-  }
-  
-  const requestData = requestDoc.data();
-  const country = requestData?.country || null;
-  const minPrice = requestData?.min_price || null;
-  const currentStudentPrice = requestData?.student_price || null;
-  
-  // Use tutor_price from offer (what tutor will receive)
-  const tutorPrice = offerData.tutor_price || offerData.price; // Fallback to price for legacy offers
-  
-  // Calculate student_price based on pricing priority rules
-  const calculatedStudentPrice = calculateStudentPrice({
-    student_price: currentStudentPrice, // Keep override if exists
-    tutor_price: tutorPrice,
-    country: country,
-    min_price: minPrice
-  });
-  
-  // Update the offer status
-  await adminDb
-    .collection('requests')
-    .doc(requestId)
-    .collection('tutor_offers')
-    .doc(offerId)
-    .update({
-      status: 'accepted',
-      updated_at: new Date()
+  if (offerData) {
+    // Update the request with tutor assignment
+    await adminDb.collection('requests').doc(requestId).update({
+      tutor_id: offerData.tutor_id,
+      tutor_price: offerData.price,
+      tutor_accepted: '1',
+      request_status: 'pending_payment',
+      accepted: '1',
+      updated_at: new Date(),
+      had_fixed_price_before_payment: true // Flag when tutor is assigned via offer acceptance
     });
-  
-  // Update the request with tutor assignment
-  const updateData: any = {
-    tutor_id: offerData.tutor_id,
-    tutor_price: tutorPrice,
-    tutor_accepted: '1',
-    request_status: 'pending_payment', // Changed from 'ONGOING' to 'pending_payment' per spec
-    accepted: '1',
-    updated_at: new Date()
-  };
-  
-  // Only update student_price if it's not already an override
-  if (!currentStudentPrice || currentStudentPrice === '0' || currentStudentPrice === '') {
-    updateData.student_price = calculatedStudentPrice;
   }
-  
-  await adminDb.collection('requests').doc(requestId).update(updateData);
-  
-  // Reject other pending offers
-  const otherOffersSnapshot = await adminDb
-    .collection('requests')
-    .doc(requestId)
-    .collection('tutor_offers')
-    .where('tutor_id', '!=', offerData.tutor_id)
-    .where('status', '==', 'pending')
-    .get();
-  
-  const now = new Date();
-  const rejectPromises = otherOffersSnapshot.docs.map(doc =>
-    doc.ref.update({
-      status: 'rejected',
-      cancel_reason: 'Another tutor was selected',
-      updated_at: now
-    })
-  );
-  
-  await Promise.all(rejectPromises);
 }
 
 async function rejectTutorOffer(requestId: string, offerId: string, reason?: string) {

@@ -153,8 +153,21 @@ export const useRequestManagementStore = create<RequestManagementStore>((set, ge
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Requests search failed');
 
+      console.log('[Request Store] API Response:', {
+        success: result.success,
+        hitsCount: result.hits?.length || 0,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
+      });
+
       const hits = (result.hits || []).map((h: any) => ({ id: h.id || h.objectID, ...h }));
       const converted = convertTimestamps(hits);
+
+      console.log('[Request Store] Processed requests:', {
+        convertedCount: converted.length,
+        firstRequestId: converted[0]?.id || 'none',
+      });
 
       set({
         requests: converted,

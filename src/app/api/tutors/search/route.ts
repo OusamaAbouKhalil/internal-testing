@@ -23,10 +23,11 @@ type SearchBody = {
 };
 
 export async function POST(request: Request) {
+  const body = (await request.json()) as SearchBody;
+  const page = Math.max(1, body.page || 1);
+  const perPage = Math.max(1, Math.min(100, body.perPage || 10));
+  
   try {
-    const body = (await request.json()) as SearchBody;
-    const page = Math.max(1, body.page || 1);
-    const perPage = Math.max(1, Math.min(100, body.perPage || 10));
 
     // Combine all search queries (search, email, nickname, phone, whatsapp_phone) into one query
     const searchQueries: string[] = [];
@@ -126,6 +127,12 @@ export async function POST(request: Request) {
       return timeB - timeA; // Descending order
     });
 
+    // Fallback to Firestore if Algolia index is empty
+    if (res.nbHits === 0) {
+      console.log('[Tutors Search] Algolia index is empty, falling back to Firestore...');
+      return await fallbackToFirestore(body, page, perPage);
+    }
+
     return NextResponse.json({
       success: true,
       hits: sortedHits,
@@ -136,7 +143,118 @@ export async function POST(request: Request) {
     });
   } catch (err: any) {
     console.error('Algolia search error:', err);
-    return NextResponse.json({ success: false, error: err?.message || 'Search failed' }, { status: 500 });
+    // Fallback to Firestore on error
+    console.log('[Tutors Search] Algolia error, falling back to Firestore...');
+    try {
+      return await fallbackToFirestore(body, page, perPage);
+    } catch (fallbackErr: any) {
+      console.error('Firestore fallback error:', fallbackErr);
+      return NextResponse.json({ success: false, error: err?.message || 'Search failed' }, { status: 500 });
+    }
+  }
+}
+
+// Fallback function to query Firestore directly
+async function fallbackToFirestore(
+  body: SearchBody,
+  page: number,
+  perPage: number
+) {
+  try {
+    const f = body.filters || {};
+    let query = adminDb.collection('tutors').orderBy('created_at', 'desc');
+
+    // Apply Firestore filters
+    if (f.verified !== undefined) {
+      query = query.where('verified', '==', f.verified ? '2' : '0');
+    }
+    if (f.cancelled !== undefined) {
+      query = query.where('cancelled', '==', f.cancelled ? '1' : '0');
+    }
+    if (f.deleted === true) {
+      query = query.where('deleted_at', '!=', null);
+    } else if (f.deleted === false) {
+      query = query.where('deleted_at', '==', null);
+    }
+    if (f.country) {
+      query = query.where('country', '==', f.country);
+    }
+    if (f.nationality) {
+      query = query.where('nationality', '==', f.nationality);
+    }
+    if (f.gender) {
+      query = query.where('gender', '==', f.gender);
+    }
+
+    query = query.limit(perPage + 1);
+
+    const snapshot = await query.get();
+    const docs = snapshot.docs;
+    const hasNextPage = docs.length > perPage;
+    const tutorDocs = hasNextPage ? docs.slice(0, perPage) : docs;
+
+    let tutors = tutorDocs.map((doc: any) => {
+      const data = doc.data();
+      return {
+        objectID: doc.id,
+        id: doc.id,
+        ...data,
+        // Convert Firestore timestamps to ISO strings
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+        deleted_at: data.deleted_at?.toDate?.()?.toISOString() || data.deleted_at,
+      };
+    });
+
+    // Apply text search if query is provided
+    if (body.query || body.email || body.nickname || body.phone || body.whatsapp_phone) {
+      const searchTerms = [
+        body.query,
+        body.email,
+        body.nickname,
+        body.phone,
+        body.whatsapp_phone,
+      ].filter(Boolean).map(term => term!.toLowerCase());
+
+      tutors = tutors.filter((tutor: any) => {
+        const fullName = (tutor.full_name || '').toLowerCase();
+        const email = (tutor.email || '').toLowerCase();
+        const nickname = (tutor.nickname || '').toLowerCase();
+        const phone = (tutor.phone || '').toLowerCase();
+        const whatsapp = (tutor.whatsapp_phone || '').toLowerCase();
+
+        return searchTerms.some(term =>
+          fullName.includes(term) ||
+          email.includes(term) ||
+          nickname.includes(term) ||
+          phone.includes(term) ||
+          whatsapp.includes(term)
+        );
+      });
+    }
+
+    // Get total count
+    const totalSnapshot = await adminDb.collection('tutors').count().get();
+    const total = totalSnapshot.data().count || tutors.length;
+
+    console.log('[Tutors Search] Firestore fallback:', {
+      hitsCount: tutors.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / perPage),
+    });
+
+    return NextResponse.json({
+      success: true,
+      hits: tutors,
+      total,
+      page,
+      totalPages: Math.ceil(total / perPage),
+      perPage,
+    });
+  } catch (err: any) {
+    console.error('Firestore fallback error:', err);
+    throw err;
   }
 }
 

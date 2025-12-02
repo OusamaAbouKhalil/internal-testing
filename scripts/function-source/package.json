@@ -1,0 +1,28 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "deploy:testing": "firebase use testing && firebase deploy --only functions",
+    "deploy:prod": "firebase use prod && firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "lint": "echo 'Skipping lint step'",
+    "build": "tsc"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js", 
+  "dependencies": {
+    "algoliasearch": "^5.41.0",
+    "firebase-admin": "^10.0.2",
+    "firebase-functions": "^3.18.0"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^0.2.0"
+  },
+  "private": true
+}

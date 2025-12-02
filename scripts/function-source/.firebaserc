@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "oeg-testing",
+    "testing": "oeg-testing",
+    "prod": "oureasygame-internal-testing"
+  }
+}
+

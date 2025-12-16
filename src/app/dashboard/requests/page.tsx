@@ -44,7 +44,9 @@ import {
   Columns4,
   MessageCircle,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useFirebaseAuthStore } from '@/stores/firebase-auth-store';
@@ -226,6 +228,122 @@ function ReportDetailsButton({ requestId }: { requestId: string }) {
     }
   }, [isOpen, requestId, reportData, loading]);
 
+  // Helper function to check if a file is an image
+  const isImageFile = (path: string): boolean => {
+    const extension = path.split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(extension || '');
+  };
+
+  // Helper function to get file name from path
+  const getFileName = (path: string): string => {
+    return path.split('/').pop() || 'File';
+  };
+
+  // Component to render a file with loading state
+  const FileItem = ({ path, alt, index }: { path: string; alt: string; index: number }) => {
+    const [imageLoading, setImageLoading] = useState(true);
+    const [fileLoading, setFileLoading] = useState(true);
+    const fileUrl = path.startsWith('http') 
+      ? path 
+      : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
+    const fileName = getFileName(path);
+    const isImage = isImageFile(path);
+
+    // For files, set loading to false after a short delay
+    useEffect(() => {
+      if (!isImage && fileLoading) {
+        const timer = setTimeout(() => {
+          setFileLoading(false);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }, [isImage, fileLoading]);
+
+    if (isImage) {
+      // Render as image with loading effect
+      return (
+        <a
+          key={index}
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative group"
+        >
+          {imageLoading && (
+            <div className="absolute inset-0 bg-gradient-to-r from-[#D040C9]/20 via-[#D040C9]/10 to-[#D040C9]/20 animate-pulse rounded-md flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-[#D040C9] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          <img
+            src={fileUrl}
+            alt={alt}
+            className={`w-full h-32 object-cover rounded-md border border-gray-200 hover:border-[#D040C9] transition-all cursor-pointer ${
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
+            onLoad={() => setImageLoading(false)}
+            onError={(e) => {
+              setImageLoading(false);
+              (e.target as HTMLImageElement).src = '/placeholder-image.png';
+            }}
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
+            <ExternalLink className="h-5 w-5 text-white" />
+          </div>
+        </a>
+      );
+    } else {
+      // Render as file with icon and loading effect
+      return (
+        <a
+          key={index}
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          download
+          className="relative flex flex-col items-center justify-center p-4 border border-gray-200 rounded-md hover:border-[#D040C9] hover:bg-[#D040C9]/5 transition-all cursor-pointer group"
+          style={{
+            boxShadow: fileLoading ? 'none' : '0 0 10px 2px rgba(208, 64, 201, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 15px 3px rgba(208, 64, 201, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = fileLoading ? 'none' : '0 0 10px 2px rgba(208, 64, 201, 0.1)';
+          }}
+        >
+          {fileLoading && (
+            <div className="absolute inset-0 bg-gradient-to-r from-[#D040C9]/20 via-[#D040C9]/10 to-[#D040C9]/20 animate-pulse rounded-md flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-[#D040C9] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
+          <FileText 
+            className={`h-12 w-12 mb-2 transition-all ${
+              fileLoading ? 'text-gray-300' : 'text-[#D040C9] group-hover:text-[#B836A8]'
+            }`}
+            style={{ 
+              filter: fileLoading ? 'none' : 'drop-shadow(0 0 4px rgba(208, 64, 201, 0.3))'
+            }}
+          />
+          <span 
+            className={`text-xs text-center truncate w-full px-1 transition-colors ${
+              fileLoading ? 'text-gray-400' : 'text-gray-600 group-hover:text-[#D040C9]'
+            }`}
+            title={fileName}
+          >
+            {fileName}
+          </span>
+          <Download 
+            className={`h-4 w-4 mt-1 transition-all ${
+              fileLoading 
+                ? 'opacity-0 text-gray-400' 
+                : 'opacity-0 group-hover:opacity-100 text-[#D040C9]'
+            }`}
+          />
+        </a>
+      );
+    }
+  };
+
   return (
     <>
       <Button
@@ -340,32 +458,9 @@ function ReportDetailsButton({ requestId }: { requestId: string }) {
                       <div>
                         <span className="text-xs text-muted-foreground font-medium">Official Grades ({reportData.grades.length}):</span>
                         <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {reportData.grades.map((path: string, index: number) => {
-                            const imageUrl = path.startsWith('http') 
-                              ? path 
-                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
-                            return (
-                              <a
-                                key={index}
-                                href={imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="relative group"
-                              >
-                                <img
-                                  src={imageUrl}
-                                  alt={`Official Grade ${index + 1}`}
-                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <ExternalLink className="h-5 w-5 text-white" />
-                                </div>
-                              </a>
-                            );
-                          })}
+                          {reportData.grades.map((path: string, index: number) => (
+                            <FileItem key={index} path={path} alt={`Official Grade ${index + 1}`} index={index} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -373,32 +468,9 @@ function ReportDetailsButton({ requestId }: { requestId: string }) {
                       <div>
                         <span className="text-xs text-muted-foreground font-medium">Class Averages ({reportData.averages.length}):</span>
                         <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {reportData.averages.map((path: string, index: number) => {
-                            const imageUrl = path.startsWith('http') 
-                              ? path 
-                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
-                            return (
-                              <a
-                                key={index}
-                                href={imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="relative group"
-                              >
-                                <img
-                                  src={imageUrl}
-                                  alt={`Class Average ${index + 1}`}
-                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <ExternalLink className="h-5 w-5 text-white" />
-                                </div>
-                              </a>
-                            );
-                          })}
+                          {reportData.averages.map((path: string, index: number) => (
+                            <FileItem key={index} path={path} alt={`Class Average ${index + 1}`} index={index} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -406,32 +478,9 @@ function ReportDetailsButton({ requestId }: { requestId: string }) {
                       <div>
                         <span className="text-xs text-muted-foreground font-medium">Exam Answers ({reportData.answers.length}):</span>
                         <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {reportData.answers.map((path: string, index: number) => {
-                            const imageUrl = path.startsWith('http') 
-                              ? path 
-                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
-                            return (
-                              <a
-                                key={index}
-                                href={imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="relative group"
-                              >
-                                <img
-                                  src={imageUrl}
-                                  alt={`Exam Answer ${index + 1}`}
-                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <ExternalLink className="h-5 w-5 text-white" />
-                                </div>
-                              </a>
-                            );
-                          })}
+                          {reportData.answers.map((path: string, index: number) => (
+                            <FileItem key={index} path={path} alt={`Exam Answer ${index + 1}`} index={index} />
+                          ))}
                         </div>
                       </div>
                     )}

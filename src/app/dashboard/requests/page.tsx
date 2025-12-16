@@ -43,7 +43,8 @@ import {
   Columns3,
   Columns4,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useFirebaseAuthStore } from '@/stores/firebase-auth-store';
@@ -197,6 +198,258 @@ function ChatButton({ request }: { request: Request }) {
   );
 }
 
+function ReportDetailsButton({ requestId }: { requestId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [reportData, setReportData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch report details when dialog opens
+  useEffect(() => {
+    if (isOpen && !reportData && !loading) {
+      setLoading(true);
+      
+      const fetchReportDetails = async () => {
+        try {
+          const response = await fetch(`/api/requests/${requestId}/report`);
+          const data = await response.json();
+          if (data?.success && data?.report) {
+            setReportData(data.report);
+          }
+        } catch (error) {
+          console.error('Error fetching report details:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      fetchReportDetails();
+    }
+  }, [isOpen, requestId, reportData, loading]);
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className="h-8 w-8 p-0"
+        style={{ color: '#D040C9' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = '#B836A8';
+          e.currentTarget.style.backgroundColor = 'rgba(208, 64, 201, 0.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = '#D040C9';
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        title="View issue report details"
+      >
+        <AlertTriangle className="h-5 w-5" style={{ fill: '#D040C9', color: '#D040C9' }} />
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" style={{ color: '#D040C9', fill: '#D040C9' }} />
+              Issue Report Details
+            </DialogTitle>
+          </DialogHeader>
+          {loading ? (
+            <div className="py-6"><LoadingSpinner /></div>
+          ) : reportData ? (
+            <div className="space-y-4">
+              {reportData.created_at && (
+                <div className="text-sm text-muted-foreground" suppressHydrationWarning>
+                  Reported on: {(() => {
+                    try {
+                      const date = new Date(reportData.created_at);
+                      return isNaN(date.getTime()) 
+                        ? reportData.created_at 
+                        : format(date, 'PPpp');
+                    } catch {
+                      return reportData.created_at;
+                    }
+                  })()}
+                </div>
+              )}
+
+              {reportData.quality && reportData.quality.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold">Quality of Work Issues:</Label>
+                  <ul className="mt-2 space-y-1">
+                    {reportData.quality.map((issue: string, index: number) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {reportData.relevance && reportData.relevance.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold">Relevance Issues:</Label>
+                  <ul className="mt-2 space-y-1">
+                    {reportData.relevance.map((issue: string, index: number) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {reportData.communication && reportData.communication.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold">Communication Issues:</Label>
+                  <ul className="mt-2 space-y-1">
+                    {reportData.communication.map((issue: string, index: number) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {reportData.results && reportData.results.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold">Results Issues:</Label>
+                  <ul className="mt-2 space-y-1">
+                    {reportData.results.map((issue: string, index: number) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(reportData.grades && reportData.grades.length > 0) ||
+               (reportData.averages && reportData.averages.length > 0) ||
+               (reportData.answers && reportData.answers.length > 0) ? (
+                <div>
+                  <Label className="text-sm font-semibold">Supporting Documents:</Label>
+                  <div className="mt-2 space-y-4">
+                    {reportData.grades && reportData.grades.length > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground font-medium">Official Grades ({reportData.grades.length}):</span>
+                        <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {reportData.grades.map((path: string, index: number) => {
+                            const imageUrl = path.startsWith('http') 
+                              ? path 
+                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
+                            return (
+                              <a
+                                key={index}
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="relative group"
+                              >
+                                <img
+                                  src={imageUrl}
+                                  alt={`Official Grade ${index + 1}`}
+                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <ExternalLink className="h-5 w-5 text-white" />
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {reportData.averages && reportData.averages.length > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground font-medium">Class Averages ({reportData.averages.length}):</span>
+                        <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {reportData.averages.map((path: string, index: number) => {
+                            const imageUrl = path.startsWith('http') 
+                              ? path 
+                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
+                            return (
+                              <a
+                                key={index}
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="relative group"
+                              >
+                                <img
+                                  src={imageUrl}
+                                  alt={`Class Average ${index + 1}`}
+                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <ExternalLink className="h-5 w-5 text-white" />
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {reportData.answers && reportData.answers.length > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground font-medium">Exam Answers ({reportData.answers.length}):</span>
+                        <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {reportData.answers.map((path: string, index: number) => {
+                            const imageUrl = path.startsWith('http') 
+                              ? path 
+                              : `https://oureasygamestoreage.nyc3.digitaloceanspaces.com${path.startsWith('/') ? path : '/' + path}`;
+                            return (
+                              <a
+                                key={index}
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="relative group"
+                              >
+                                <img
+                                  src={imageUrl}
+                                  alt={`Exam Answer ${index + 1}`}
+                                  className="w-full h-32 object-cover rounded-md border border-gray-200 hover:border-primary transition-colors cursor-pointer"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/placeholder-image.png';
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <ExternalLink className="h-5 w-5 text-white" />
+                                </div>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="py-4 text-sm text-muted-foreground">
+              No report details found.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function RequestCard({ request }: { request: Request }) {
   const { hasPermission } = useFirebaseAuthStore();
 	const formatDate = (value: any) => {
@@ -314,10 +567,22 @@ function RequestCard({ request }: { request: Request }) {
     }
   };
 
+  const hasIssueReported = request?.issue_reported === "1";
+
   return (
     <Card 
       id={`request-${request.id}`}
-      className="hover:shadow-md transition-shadow cursor-pointer min-w-0"
+      className={`hover:shadow-md transition-all cursor-pointer min-w-0 ${
+        hasIssueReported 
+          ? 'ring-2 ring-offset-2 shadow-lg' 
+          : ''
+      }`}
+      style={hasIssueReported ? {
+        boxShadow: '0 0 20px 5px rgba(208, 64, 201, 0.4), 0 10px 15px -3px rgba(208, 64, 201, 0.3), 0 4px 6px -2px rgba(208, 64, 201, 0.2), 0 0 0 2px rgba(208, 64, 201, 0.8)',
+        borderColor: '#D040C9',
+        borderWidth: '2px',
+        '--tw-ring-color': '#D040C9'
+      } as React.CSSProperties & { '--tw-ring-color'?: string } : undefined}
     >
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
@@ -331,6 +596,7 @@ function RequestCard({ request }: { request: Request }) {
             </a>
           </CardTitle>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {hasIssueReported && <ReportDetailsButton requestId={request.id} />}
             <Button
               variant="ghost"
               size="sm"
@@ -351,6 +617,22 @@ function RequestCard({ request }: { request: Request }) {
           <Badge className={`text-xs ${getRequestStatusColor(request.request_status)}`}>
             {getRequestStatusLabel(request.request_status)}
           </Badge>
+          {hasIssueReported && (
+            <Badge 
+              variant="destructive" 
+              className="text-xs text-white"
+              style={{ backgroundColor: '#D040C9' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#B836A8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#D040C9';
+              }}
+            >
+              <AlertTriangle className="h-3 w-3 mr-1 fill-white" />
+              Issue Reported
+            </Badge>
+          )}
           {/* Student quick view */}
           <StudentInfoButton studentId={request.student_id} />
         </div>

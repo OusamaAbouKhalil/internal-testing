@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(process.cwd()),
+  turbopack: {},
   serverExternalPackages: ['firebase-admin'],
   webpack: (config, { isServer }) => {
     if (isServer) {
